@@ -7,11 +7,18 @@ class Server
     private $host;
     private $port;
     private $socket;
+    private $router;
 
     public function __construct($host = '0.0.0.0', $port = 8080)
     {
         $this->host = $host;
         $this->port = $port;
+        $this->router = new Router();
+    }
+
+    public function getRouter()
+    {
+        return $this->router;
     }
 
     public function start()
@@ -37,7 +44,7 @@ class Server
                 $rawRequest = fread($conn, 8192);
 
                 if ($rawRequest === false || $rawRequest === '') {
-                    echo "Failed to read request or empty request.\n";
+                    echo "Connection closed by client.\n";
                     fclose($conn);
                     continue;
                 }
@@ -48,12 +55,23 @@ class Server
                 // Log the parsed request
                 echo "Request: {$request->getMethod()} {$request->getUri()}\n";
 
-                // Create a response
-                $response = new Response();
-                $response->setStatusCode(200)
-                    ->setHeader('Content-Type', 'text/plain')
-                    ->setHeader('Connection', 'close')
-                    ->setBody('Hello, World!\n');
+                // Match the request to a route
+                $route = $this->router->match($request->getMethod(), $request->getUri());
+
+                if ($route) {
+                    // Call the route handler
+                    $handler = $route['handler'];
+                    $params = $route['params'];
+
+                    $response = new Response();
+                    call_user_func_array($handler, [$request, $response, $params]);
+                } else {
+                    // No route matched, return a 404 response
+                    $response = new Response();
+                    $response->setStatusCode(404)
+                        ->setHeader('Content-Type', 'text/plain')
+                        ->setBody('404 Not Found');
+                }
 
                 // Send the response
                 $response->send($conn);
