@@ -5,7 +5,7 @@ namespace PhpHttpServer\WebSocket;
 use PhpHttpServer\Core\Request;
 use PhpHttpServer\Core\Response;
 
-class WebSocketServer
+class WebSocketServer implements WebSocketHandlerInterface
 {
     /**
      * Perform the WebSocket handshake.
@@ -43,11 +43,11 @@ class WebSocketServer
     }
 
     /**
-     * Handle WebSocket communication.
+     * Handle a WebSocket connection.
      *
      * @param resource $conn The connection resource.
      */
-    public function handleWebSocketConnection($conn)
+    public function handle($conn)
     {
         echo "WebSocket connection established.\n";
 

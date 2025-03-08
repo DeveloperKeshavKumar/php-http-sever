@@ -2,17 +2,20 @@
 
 require __DIR__ . '/../vendor/autoload.php';
 
+use PhpHttpServer\Core\Router;
 use PhpHttpServer\Core\Server;
 use PhpHttpServer\Core\Request;
 use PhpHttpServer\Core\Response;
 
 use PhpHttpServer\Middleware\ExampleMiddleware;
 use PhpHttpServer\Middleware\ModifyRequestResponseMiddleware;
+use PhpHttpServer\WebSocket\WebSocketServer;
 
-// Add global middleware
+$webSocketServer = new WebSocketServer();
+$router = new Router();
 
 // Create a new server instance
-$server = new Server('0.0.0.0', 8080);
+$server = new Server('0.0.0.0', 8080, $router, $webSocketServer);
 
 // Define routes
 $server->getRouter()->addGlobalMiddleware(new ExampleMiddleware('Global1'));

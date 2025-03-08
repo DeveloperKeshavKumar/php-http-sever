@@ -2,7 +2,7 @@
 
 namespace PhpHttpServer\Core;
 
-use PhpHttpServer\WebSocket\WebSocketServer;
+use PhpHttpServer\WebSocket\WebSocketHandlerInterface;
 
 class Server
 {
@@ -10,14 +10,14 @@ class Server
     private $port;
     private $socket;
     private $router;
-    private $webSocketServer;
+    private $webSocketHandler;
 
-    public function __construct($host = '0.0.0.0', $port = 8080)
+    public function __construct($host = '0.0.0.0', $port = 8080, RouterInterface $router, WebSocketHandlerInterface $webSocketHandler )
     {
         $this->host = $host;
         $this->port = $port;
-        $this->router = new Router();
-        $this->webSocketServer = new WebSocketServer();
+        $this->router = $router;
+        $this->webSocketHandler = $webSocketHandler;
     }
 
     public function getRouter()
@@ -53,21 +53,27 @@ class Server
                     continue;
                 }
 
+                echo "Raw request received:\n$rawRequest\n";
+
                 // Parse the request
                 $request = new Request($rawRequest);
 
                 // Log the parsed request
-                echo "Request: {$request->getMethod()} {$request->getUri()}\n";
+                echo "Received request:\n";
+                echo "Method: " . $request->getMethod() . "\n";
+                echo "URI: " . $request->getUri() . "\n";
+                echo "Headers: " . print_r($request->getHeaders(), true) . "\n";
+                echo "Body: " . $request->getBody() . "\n";
 
                 // Check if the request is a WebSocket upgrade request
-                if ($this->webSocketServer->handshake($request, $response = new Response())) {
+                if ($this->webSocketHandler->handshake($request, $response = new Response())) {
                     echo "WebSocket handshake successful.\n";
 
                     // Send the WebSocket handshake response
                     $response->send($conn);
 
                     // Handle WebSocket communication
-                    $this->webSocketServer->handleWebSocketConnection($conn);
+                    $this->webSocketHandler->handle($conn);
                     continue; // Skip the rest of the loop
                 }
 

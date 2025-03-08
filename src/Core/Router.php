@@ -4,7 +4,7 @@ namespace PhpHttpServer\Core;
 
 use PhpHttpServer\Middleware\MiddlewareInterface;
 
-class Router
+class Router implements RouterInterface
 {
     private $routes = [
         'GET' => [],
@@ -66,7 +66,7 @@ class Router
     {
         // Convert route URI to a regex pattern
         $pattern = preg_replace('/\//', '\\/', $routeUri); // Escape slashes
-        $pattern = preg_replace('/:([a-zA-Z0-9_]+)/', '(?P<\1>[a-zA-Z0-9_]+)', $pattern);
+        $pattern = preg_replace('/:([a-zA-Z0-9_]+)/', '(?P<\1>[a-zA-Z0-9_]+)', $pattern); // Replace parameters with regex groups
         $pattern = '/^' . $pattern . '$/';
 
         // Match the request URI against the pattern
