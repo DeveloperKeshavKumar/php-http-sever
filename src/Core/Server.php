@@ -65,8 +65,8 @@ class Server
                     // Send the WebSocket handshake response
                     $response->send($conn);
 
-                    // Handle WebSocket communication (to be implemented in Step 4.2)
-                    $this->handleWebSocketConnection($conn);
+                    // Handle WebSocket communication
+                    $this->webSocketServer->handleWebSocketConnection($conn);
                     continue;
                 }
 
@@ -113,13 +113,6 @@ class Server
                 echo "Response sent and connection closed.\n";
             }
         }
-    }
-
-    private function handleWebSocketConnection($conn)
-    {
-        echo "WebSocket connection established.\n";
-
-        // TODO: Implement WebSocket frame handling (Step 4.2)
     }
 
     public function stop()
