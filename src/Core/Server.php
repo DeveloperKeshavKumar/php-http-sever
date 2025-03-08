@@ -31,27 +31,37 @@ class Server
             $conn = stream_socket_accept($this->socket, -1);
 
             if ($conn) {
+                echo "New connection accepted.\n";
+
                 // Read the request from the client
                 $rawRequest = fread($conn, 8192);
+
+                if ($rawRequest === false || $rawRequest === '') {
+                    echo "Failed to read request or empty request.\n";
+                    fclose($conn);
+                    continue;
+                }
 
                 // Parse the request
                 $request = new Request($rawRequest);
 
                 // Log the parsed request
-                echo "Received request:\n";
-                echo "Method: " . $request->getMethod() . "\n";
-                echo "URI: " . $request->getUri() . "\n";
-                echo "Headers: " . print_r($request->getHeaders(), true) . "\n";
-                echo "Body: " . $request->getBody() . "\n";
+                echo "Request: {$request->getMethod()} {$request->getUri()}\n";
 
-                // Send a basic HTTP response
-                $response = "HTTP/1.1 200 OK\r\n";
-                $response .= "Content-Type: text/plain\r\n";
-                $response .= "Connection: close\r\n\r\n";
-                $response .= "Hello, World!";
+                // Create a response
+                $response = new Response();
+                $response->setStatusCode(200)
+                    ->setHeader('Content-Type', 'text/plain')
+                    ->setHeader('Connection', 'close')
+                    ->setBody('Hello, World!\n');
 
-                fwrite($conn, $response);
+                // Send the response
+                $response->send($conn);
+
+                // Close the connection
                 fclose($conn);
+
+                echo "Response sent and connection closed.\n";
             }
         }
     }
