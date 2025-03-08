@@ -6,12 +6,25 @@ use PhpHttpServer\Core\Server;
 use PhpHttpServer\Core\Request;
 use PhpHttpServer\Core\Response;
 
+use PhpHttpServer\Middleware\ExampleMiddleware;
+
+// Add global middleware
+
 // Create a new server instance
 $server = new Server('0.0.0.0', 8080);
 
 // Define routes
+$server->getRouter()->addGlobalMiddleware(new ExampleMiddleware('Global1'));
+$server->getRouter()->addGlobalMiddleware(new ExampleMiddleware('Global2'));
+
+$server->getRouter()->addRoute('GET', '/test', function (Request $request, Response $response) {
+    $response->setStatusCode(200)
+        ->sendText('This is a test route.');
+}, [new ExampleMiddleware('Route-Specific'), new ExampleMiddleware('Route-Specific2')]);
+
 $server->getRouter()->addRoute('GET', '/', function (Request $request, Response $response) {
     $data = ['name' => 'John Doe'];
+    echo "Route Handler: Handling the request.\n";
     $response->setStatusCode(200)
         ->render(__DIR__ . '/../views/home.php', $data);
 });

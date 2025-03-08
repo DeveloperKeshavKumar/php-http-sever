@@ -2,6 +2,8 @@
 
 namespace PhpHttpServer\Core;
 
+use PhpHttpServer\Middleware\MiddlewareInterface;
+
 class Router
 {
     private $routes = [
@@ -14,18 +16,25 @@ class Router
         'HEAD' => [],
     ];
 
-    public function addRoute($method, $uri, $handler)
+    private $globalMiddleware = [];
+
+    public function addRoute($method, $uri, $handler, $middleware = [])
     {
         $method = strtoupper($method);
         if (!isset($this->routes[$method])) {
             throw new \InvalidArgumentException("Unsupported HTTP method: $method");
         }
 
-        // Add the route to the appropriate method group
         $this->routes[$method][] = [
             'uri' => $uri,
             'handler' => $handler,
+            'middleware' => $middleware,
         ];
+    }
+
+    public function addGlobalMiddleware(MiddlewareInterface $middleware)
+    {
+        $this->globalMiddleware[] = $middleware;
     }
 
     public function match($method, $uri)
@@ -35,11 +44,11 @@ class Router
             return null;
         }
 
-        // Iterate through routes for the specific HTTP method
         foreach ($this->routes[$method] as $route) {
             if ($this->matchUri($route['uri'], $uri, $params)) {
                 return [
                     'handler' => $route['handler'],
+                    'middleware' => $route['middleware'],
                     'params' => $params,
                 ];
             }
@@ -48,11 +57,16 @@ class Router
         return null;
     }
 
+    public function getGlobalMiddleware()
+    {
+        return $this->globalMiddleware;
+    }
+
     private function matchUri($routeUri, $requestUri, &$params)
     {
         // Convert route URI to a regex pattern
         $pattern = preg_replace('/\//', '\\/', $routeUri); // Escape slashes
-        $pattern = preg_replace(pattern: '/:([a-zA-Z0-9_]+)/', replacement: '(?P<\1>[a-zA-Z0-9_]+)', subject: $pattern);
+        $pattern = preg_replace('/:([a-zA-Z0-9_]+)/', '(?P<\1>[a-zA-Z0-9_]+)', $pattern);
         $pattern = '/^' . $pattern . '$/';
 
         // Match the request URI against the pattern
