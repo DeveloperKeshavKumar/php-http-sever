@@ -32,10 +32,17 @@ class Server
 
             if ($conn) {
                 // Read the request from the client
-                $request = fread($conn, 8192);
+                $rawRequest = fread($conn, 8192);
 
-                // For now, just print the raw request
-                echo "Received request:\n$request\n";
+                // Parse the request
+                $request = new Request($rawRequest);
+
+                // Log the parsed request
+                echo "Received request:\n";
+                echo "Method: " . $request->getMethod() . "\n";
+                echo "URI: " . $request->getUri() . "\n";
+                echo "Headers: " . print_r($request->getHeaders(), true) . "\n";
+                echo "Body: " . $request->getBody() . "\n";
 
                 // Send a basic HTTP response
                 $response = "HTTP/1.1 200 OK\r\n";

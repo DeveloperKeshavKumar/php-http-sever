@@ -1,6 +1,6 @@
 <?php
 
-require __DIR__ . '/../src/Core/Server.php';
+require __DIR__ . '/../vendor/autoload.php';
 
 use PhpHttpServer\Core\Server;
 
