@@ -1,0 +1,36 @@
+# Ignore Composer's vendor directory (dependencies)
+vendor/
+
+# Ignore composer.lock file if you're using different environments
+composer.lock
+
+# Ignore environment configuration files
+.env
+.env.local
+.env.*.local
+
+# Ignore PHP built-in server log files
+phpunit.xml
+phpunit.xml.dist
+
+# Ignore log files
+*.log
+
+# Ignore IDE config files (for example, for PhpStorm, VSCode)
+.idea/
+.vscode/
+
+# Ignore the cache, session files, and temp files
+var/cache/
+var/session/
+var/logs/
+tmp/
+
+# Ignore compiled PHP files
+*.php~
+
+# Ignore Mac-specific files
+.DS_Store
+
+# Ignore Windows-specific files
+Thumbs.db
