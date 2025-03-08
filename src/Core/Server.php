@@ -3,6 +3,7 @@
 namespace PhpHttpServer\Core;
 
 use PhpHttpServer\WebSocket\WebSocketHandlerInterface;
+use PhpHttpServer\Middleware\MiddlewareStack;
 
 class Server
 {
@@ -10,13 +11,20 @@ class Server
     private $port;
     private $socket;
     private $router;
+    private $middlewareStack;
     private $webSocketHandler;
 
-    public function __construct($host = '0.0.0.0', $port = 8080, RouterInterface $router, WebSocketHandlerInterface $webSocketHandler )
-    {
+    public function __construct(
+        $host = '0.0.0.0',
+        $port = 8080,
+        RouterInterface $router,
+        array $middlewareStack = [],
+        WebSocketHandlerInterface $webSocketHandler = null
+    ) {
         $this->host = $host;
         $this->port = $port;
         $this->router = $router;
+        $this->middlewareStack = $middlewareStack;
         $this->webSocketHandler = $webSocketHandler;
     }
 
@@ -53,20 +61,11 @@ class Server
                     continue;
                 }
 
-                echo "Raw request received:\n$rawRequest\n";
-
                 // Parse the request
                 $request = new Request($rawRequest);
 
-                // Log the parsed request
-                echo "Received request:\n";
-                echo "Method: " . $request->getMethod() . "\n";
-                echo "URI: " . $request->getUri() . "\n";
-                echo "Headers: " . print_r($request->getHeaders(), true) . "\n";
-                echo "Body: " . $request->getBody() . "\n";
-
                 // Check if the request is a WebSocket upgrade request
-                if ($this->webSocketHandler->handshake($request, $response = new Response())) {
+                if ($this->webSocketHandler && $this->webSocketHandler->handshake($request, $response = new Response())) {
                     echo "WebSocket handshake successful.\n";
 
                     // Send the WebSocket handshake response
@@ -83,40 +82,26 @@ class Server
         }
     }
 
-    /**
-     * Handle an HTTP request.
-     *
-     * @param resource $conn The connection resource.
-     * @param Request $request The HTTP request.
-     */
     private function handleHttpRequest($conn, Request $request)
     {
-        // Match the request to a route
         $route = $this->router->match($request->getMethod(), $request->getUri());
 
         if ($route) {
-            // Create the response
             $response = new Response();
 
             // Combine global and route-specific middleware
-            $middlewareStack = array_merge($this->router->getGlobalMiddleware(), $route['middleware']);
-
-            // Create the final handler (route handler)
-            $finalHandler = function (Request $request, Response $response) use ($route) {
-                call_user_func_array($route['handler'], [$request, $response, $route['params']]);
-            };
-
-            // Build the middleware stack
-            $middlewareStack = array_reverse($middlewareStack);
-            $next = $finalHandler;
-            foreach ($middlewareStack as $middleware) {
-                $next = function (Request $request, Response $response) use ($middleware, $next) {
-                    $middleware($request, $response, $next);
-                };
+            $middlewareStack = new MiddlewareStack();
+            foreach ($this->middlewareStack as $middleware) {
+                $middlewareStack->addMiddleware($middleware);
+            }
+            foreach ($route['middleware'] as $middleware) {
+                $middlewareStack->addMiddleware($middleware);
             }
 
             // Execute the middleware stack
-            $next($request, $response);
+            $middlewareStack->execute($request, $response, function (Request $request, Response $response) use ($route) {
+                call_user_func_array($route['handler'], [$request, $response, $route['params']]);
+            });
 
             // Send the response
             $response->send($conn);
@@ -128,10 +113,7 @@ class Server
                 ->send($conn);
         }
 
-        // Close the connection
         fclose($conn);
-
-        echo "Response sent and connection closed.\n";
     }
 
     public function stop()

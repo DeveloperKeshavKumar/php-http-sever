@@ -9,17 +9,17 @@ use PhpHttpServer\Core\Response;
 
 use PhpHttpServer\Middleware\ExampleMiddleware;
 use PhpHttpServer\Middleware\ModifyRequestResponseMiddleware;
+
 use PhpHttpServer\WebSocket\WebSocketServer;
 
-$webSocketServer = new WebSocketServer();
 $router = new Router();
+$middlewareStack = [
+    new ExampleMiddleware()
+];
+$webSocketServer = new WebSocketServer();
 
 // Create a new server instance
-$server = new Server('0.0.0.0', 8080, $router, $webSocketServer);
-
-// Define routes
-$server->getRouter()->addGlobalMiddleware(new ExampleMiddleware('Global1'));
-$server->getRouter()->addGlobalMiddleware(new ModifyRequestResponseMiddleware());
+$server = new Server('0.0.0.0', 8080, $router, $middlewareStack, $webSocketServer);
 
 $server->getRouter()->addRoute('GET', '/test', function (Request $request, Response $response) {
     $response->setStatusCode(200)

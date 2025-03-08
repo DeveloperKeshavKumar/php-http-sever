@@ -117,9 +117,18 @@ $response->setStatusCode(200)
 php-http-server/
 ├── src/
 │   ├── Core/
-│   │   ├── Server.php          # Main server logic
-│   │   ├── Request.php         # Request class to handle HTTP requests
-│   │   └── Response.php        # Response class to handle HTTP responses
+│   │   ├── Server.php                    # Main HTTP server logic
+│   │   ├── Request.php                   # HTTP request class
+│   │   ├── Response.php                  # HTTP response class
+│   │   ├── Router.php                    # HTTP response class
+│   │   └── RouterInterface.php           # Router interface
+│   ├── WebSocket/
+│   │   ├── WebSocketServer.php           # WebSocket server logic
+│   │   └── WebSocketHandlerInterface.php # WebSocket frame handling logic
+│   ├── Middleware/
+│   │   ├── MiddlewareInterface.php       # Middleware contract
+│   │   ├── ModifyRequestResponseMiddleware.php       # Middleware to modify Request and Response
+│   │   └── ExampleMiddleware.php         # Example middleware
 ├── public/
 │   └── index.php               # Entry point for the server
 ├── composer.json               # Composer configuration (optional, for autoloading)
