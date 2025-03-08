@@ -69,4 +69,9 @@ class Request
     {
         $this->headers[$name] = $value;
     }
+
+    public function getHeader($name)
+    {
+        return $this->headers[$name] ?? null;
+    }
 }

@@ -2,18 +2,22 @@
 
 namespace PhpHttpServer\Core;
 
+use PhpHttpServer\WebSocket\WebSocketServer;
+
 class Server
 {
     private $host;
     private $port;
     private $socket;
     private $router;
+    private $webSocketServer;
 
     public function __construct($host = '0.0.0.0', $port = 8080)
     {
         $this->host = $host;
         $this->port = $port;
         $this->router = new Router();
+        $this->webSocketServer = new WebSocketServer();
     }
 
     public function getRouter()
@@ -55,6 +59,17 @@ class Server
                 // Log the parsed request
                 echo "Request: {$request->getMethod()} {$request->getUri()}\n";
 
+                if ($this->webSocketServer->handshake($request, $response = new Response())) {
+                    echo "WebSocket handshake successful.\n";
+
+                    // Send the WebSocket handshake response
+                    $response->send($conn);
+
+                    // Handle WebSocket communication (to be implemented in Step 4.2)
+                    $this->handleWebSocketConnection($conn);
+                    continue;
+                }
+
                 // Match the request to a route
                 $route = $this->router->match($request->getMethod(), $request->getUri());
 
@@ -62,7 +77,6 @@ class Server
                     // Create the response
                     $response = new Response();
 
-                    
                     // Combine global and route-specific middleware
                     $middlewareStack = array_merge($this->router->getGlobalMiddleware(), $route['middleware']);
 
@@ -99,6 +113,13 @@ class Server
                 echo "Response sent and connection closed.\n";
             }
         }
+    }
+
+    private function handleWebSocketConnection($conn)
+    {
+        echo "WebSocket connection established.\n";
+
+        // TODO: Implement WebSocket frame handling (Step 4.2)
     }
 
     public function stop()
