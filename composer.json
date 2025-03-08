@@ -1,7 +1,18 @@
 {
+    "name": "arishem/php-http-server",
     "autoload": {
         "psr-4": {
             "PhpHttpServer\\": "src/"
         }
+    },
+    "authors": [
+        {
+            "name": "Keshav Kumar",
+            "email": "94639526+DeveloperKeshavKumar@users.noreply.github.com"
+        }
+    ],
+    "require": {},
+    "scripts": {
+        "dev": "php public/index.php"
     }
 }
