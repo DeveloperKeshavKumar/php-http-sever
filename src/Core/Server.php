@@ -59,6 +59,7 @@ class Server
                 // Log the parsed request
                 echo "Request: {$request->getMethod()} {$request->getUri()}\n";
 
+                // Check if the request is a WebSocket upgrade request
                 if ($this->webSocketServer->handshake($request, $response = new Response())) {
                     echo "WebSocket handshake successful.\n";
 
@@ -67,52 +68,64 @@ class Server
 
                     // Handle WebSocket communication
                     $this->webSocketServer->handleWebSocketConnection($conn);
-                    continue;
+                    continue; // Skip the rest of the loop
                 }
 
-                // Match the request to a route
-                $route = $this->router->match($request->getMethod(), $request->getUri());
-
-                if ($route) {
-                    // Create the response
-                    $response = new Response();
-
-                    // Combine global and route-specific middleware
-                    $middlewareStack = array_merge($this->router->getGlobalMiddleware(), $route['middleware']);
-
-                    // Create the final handler (route handler)
-                    $finalHandler = function (Request $request, Response $response) use ($route) {
-                        call_user_func_array($route['handler'], [$request, $response, $route['params']]);
-                    };
-
-                    // Build the middleware stack
-                    $middlewareStack = array_reverse($middlewareStack);
-                    $next = $finalHandler;
-                    foreach ($middlewareStack as $middleware) {
-                        $next = function (Request $request, Response $response) use ($middleware, $next) {
-                            $middleware($request, $response, $next);
-                        };
-                    }
-
-                    // Execute the middleware stack
-                    $next($request, $response);
-
-                    // Send the response
-                    $response->send($conn);
-                } else {
-                    // No route matched, return a 404 response
-                    $response = new Response();
-                    $response->setStatusCode(404)
-                        ->sendText('404 Not Found')
-                        ->send($conn);
-                }
-
-                // Close the connection
-                fclose($conn);
-
-                echo "Response sent and connection closed.\n";
+                // Handle HTTP requests
+                $this->handleHttpRequest($conn, $request);
             }
         }
+    }
+
+    /**
+     * Handle an HTTP request.
+     *
+     * @param resource $conn The connection resource.
+     * @param Request $request The HTTP request.
+     */
+    private function handleHttpRequest($conn, Request $request)
+    {
+        // Match the request to a route
+        $route = $this->router->match($request->getMethod(), $request->getUri());
+
+        if ($route) {
+            // Create the response
+            $response = new Response();
+
+            // Combine global and route-specific middleware
+            $middlewareStack = array_merge($this->router->getGlobalMiddleware(), $route['middleware']);
+
+            // Create the final handler (route handler)
+            $finalHandler = function (Request $request, Response $response) use ($route) {
+                call_user_func_array($route['handler'], [$request, $response, $route['params']]);
+            };
+
+            // Build the middleware stack
+            $middlewareStack = array_reverse($middlewareStack);
+            $next = $finalHandler;
+            foreach ($middlewareStack as $middleware) {
+                $next = function (Request $request, Response $response) use ($middleware, $next) {
+                    $middleware($request, $response, $next);
+                };
+            }
+
+            // Execute the middleware stack
+            $next($request, $response);
+
+            // Send the response
+            $response->send($conn);
+        } else {
+            // No route matched, return a 404 response
+            $response = new Response();
+            $response->setStatusCode(404)
+                ->sendText('404 Not Found')
+                ->send($conn);
+        }
+
+        // Close the connection
+        fclose($conn);
+
+        echo "Response sent and connection closed.\n";
     }
 
     public function stop()

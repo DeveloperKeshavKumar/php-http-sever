@@ -20,7 +20,7 @@ class ModifyRequestResponseMiddleware implements MiddlewareInterface
         $next($request, $response);
 
         // Modify the response (e.g., append to the response body)
-        $response->setBody($response->getBody() . "\nModified by Middleware");
+        $response->sendText($response->getBody() . "Modified by Middleware");
 
         // Log the modified response body
         echo "Modified Response Body:\n";

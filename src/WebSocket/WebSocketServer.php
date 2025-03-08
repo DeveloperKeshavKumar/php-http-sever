@@ -7,6 +7,13 @@ use PhpHttpServer\Core\Response;
 
 class WebSocketServer
 {
+    /**
+     * Perform the WebSocket handshake.
+     *
+     * @param Request $request The HTTP request.
+     * @param Response $response The HTTP response.
+     * @return bool True if the handshake was successful, false otherwise.
+     */
     public function handshake(Request $request, Response $response)
     {
         // Check if the request is a WebSocket upgrade request
@@ -35,6 +42,11 @@ class WebSocketServer
         return true;
     }
 
+    /**
+     * Handle WebSocket communication.
+     *
+     * @param resource $conn The connection resource.
+     */
     public function handleWebSocketConnection($conn)
     {
         echo "WebSocket connection established.\n";
@@ -72,6 +84,12 @@ class WebSocketServer
         echo "WebSocket connection closed.\n";
     }
 
+    /**
+     * Decode a WebSocket frame.
+     *
+     * @param string $frame The WebSocket frame.
+     * @return array|null The decoded frame (opcode and payload), or null if the frame is invalid.
+     */
     private function decodeWebSocketFrame($frame)
     {
         // Extract the first byte (opcode and flags)
@@ -114,6 +132,13 @@ class WebSocketServer
         ];
     }
 
+    /**
+     * Unmask a WebSocket payload.
+     *
+     * @param string $payload The masked payload.
+     * @param string $maskingKey The masking key.
+     * @return string The unmasked payload.
+     */
     private function unmaskPayload($payload, $maskingKey)
     {
         $unmaskedPayload = '';
@@ -123,6 +148,12 @@ class WebSocketServer
         return $unmaskedPayload;
     }
 
+    /**
+     * Encode a WebSocket frame.
+     *
+     * @param string $payload The payload to encode.
+     * @return string The encoded WebSocket frame.
+     */
     private function encodeWebSocketFrame($payload)
     {
         $frame = '';
