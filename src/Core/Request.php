@@ -64,4 +64,9 @@ class Request
     {
         return $this->body;
     }
+
+    public function setHeader($name, $value)
+    {
+        $this->headers[$name] = $value;
+    }
 }

@@ -7,6 +7,7 @@ use PhpHttpServer\Core\Request;
 use PhpHttpServer\Core\Response;
 
 use PhpHttpServer\Middleware\ExampleMiddleware;
+use PhpHttpServer\Middleware\ModifyRequestResponseMiddleware;
 
 // Add global middleware
 
@@ -15,7 +16,7 @@ $server = new Server('0.0.0.0', 8080);
 
 // Define routes
 $server->getRouter()->addGlobalMiddleware(new ExampleMiddleware('Global1'));
-$server->getRouter()->addGlobalMiddleware(new ExampleMiddleware('Global2'));
+$server->getRouter()->addGlobalMiddleware(new ModifyRequestResponseMiddleware());
 
 $server->getRouter()->addRoute('GET', '/test', function (Request $request, Response $response) {
     $response->setStatusCode(200)
