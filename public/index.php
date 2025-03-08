@@ -13,13 +13,20 @@ $server = new Server('0.0.0.0', 8080);
 $server->getRouter()->addRoute('GET', '/', function (Request $request, Response $response) {
     $data = ['name' => 'John Doe'];
     $response->setStatusCode(200)
-             ->render(__DIR__ . '/../views/home.php', $data);
+        ->render(__DIR__ . '/../views/home.php', $data);
 });
 
 $server->getRouter()->addRoute('GET', '/users/:id', function (Request $request, Response $response, $params) {
     $userId = $params['id'];
     $response->setStatusCode(200)
-        ->sendJson(["User ID" => (int)$userId]);
+        ->sendJson(["User ID" => (int) $userId]);
+});
+
+$server->getRouter()->addRoute('GET', '/posts/:postId/comments/:commentId', function (Request $request, Response $response, $params) {
+    $postId = $params['postId'];
+    $commentId = $params['commentId'];
+    $response->setStatusCode(200)
+        ->sendText("Post ID: $postId, Comment ID: $commentId");
 });
 
 $server->getRouter()->addRoute('POST', '/users', function (Request $request, Response $response) {
@@ -33,6 +40,29 @@ $server->getRouter()->addRoute('GET', '/about', function (Request $request, Resp
     $html = "<h1>About Us</h1><p>This is the about page.</p>";
     $response->setStatusCode(200)
         ->sendHtml($html);
+});
+
+$server->getRouter()->addRoute('GET', '/test', function (Request $request, Response $response) {
+    $response->setStatusCode(200)
+        ->sendText('This is a test route.');
+});
+
+$server->getRouter()->addRoute('OPTIONS', '/users', function (Request $request, Response $response) {
+    $response->sendOptions(['GET', 'HEAD', 'OPTIONS']);
+});
+
+$server->getRouter()->addRoute('HEAD', '/users/:id', function (Request $request, Response $response, $params) {
+    $userId = $params['id'];
+
+    $userExists = true;
+
+    if ($userExists) {
+        $response->setHeader('Content-Type', 'text/plain')
+            ->sendHead(strlen("User ID: $userId"));
+    } else {
+        $response->setStatusCode(404)
+            ->sendHead();
+    }
 });
 
 // Start the server

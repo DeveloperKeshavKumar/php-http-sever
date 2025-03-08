@@ -21,16 +21,31 @@ class Response
         return $this;
     }
 
+    public function getStatusCode()
+    {
+        return $this->statusCode;
+    }
+
     public function setHeader($name, $value)
     {
         $this->headers[$name] = $value;
         return $this;
     }
 
+    public function getHeaders()
+    {
+        return $this->headers;
+    }
+
     public function setBody($body)
     {
         $this->body = $body;
         return $this;
+    }
+
+    public function getBody()
+    {
+        return $this->body;
     }
 
     public function sendText($text)
@@ -51,6 +66,22 @@ class Response
     {
         $this->setHeader('Content-Type', 'text/html')
             ->setBody($html);
+        return $this;
+    }
+
+    public function sendOptions($allowedMethods)
+    {
+        $this->setHeader('Allow', implode(', ', $allowedMethods))
+            ->setStatusCode(200)
+            ->setBody('');
+        return $this;
+    }
+
+    public function sendHead($contentLength = 0)
+    {
+        $this->setHeader('Content-Length', $contentLength)
+            ->setStatusCode(200)
+            ->setBody('');
         return $this;
     }
 
@@ -87,7 +118,7 @@ class Response
         $headers .= "Connection: close\r\n";
 
         // Build the response
-        $response = "$statusLine . $headers . '\r\n' . $this->body";
+        $response = $statusLine . $headers . "\r\n" . $this->body;
 
         // Send the response
         fwrite($conn, $response);
