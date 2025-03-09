@@ -10,6 +10,7 @@
 <body>
     <h1>Welcome, <?= htmlspecialchars($name) ?>!</h1>
     <p>This is the home page.</p>
+    <a href="/users/192">Users</a>
 
     <div id="messages"></div>
 

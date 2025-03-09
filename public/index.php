@@ -6,71 +6,88 @@ use PhpHttpServer\Core\Router;
 use PhpHttpServer\Core\Server;
 use PhpHttpServer\Core\Request;
 use PhpHttpServer\Core\Response;
-
 use PhpHttpServer\Middleware\ExampleMiddleware;
 use PhpHttpServer\Middleware\ModifyRequestResponseMiddleware;
-
 use PhpHttpServer\WebSocket\WebSocketServer;
 
+// Initialize the router
 $router = new Router();
+
+// Middleware stack (global middleware applied to all routes)
 $middlewareStack = [
-    new ExampleMiddleware()
+    new ExampleMiddleware('Global Middleware') // Example of global middleware
 ];
+
+// Initialize WebSocket server (if you have WebSocket support)
 $webSocketServer = new WebSocketServer();
 
-// Create a new server instance
+// Create the server instance
 $server = new Server('0.0.0.0', 8080, $router, $middlewareStack, $webSocketServer);
 
-$server->getRouter()->addRoute('GET', '/test', function (Request $request, Response $response) {
-    $response->setStatusCode(200)
-        ->sendText('This is a test route.');
-}, [new ExampleMiddleware('Route-Specific'), new ExampleMiddleware('Route-Specific2')]);
+// Add a route group for `/api`
+$router->addRouteGroup('/api', function (Router $router) {
 
-$server->getRouter()->addRoute('GET', '/', function (Request $request, Response $response) {
+    // Add a GET route: /api/test
+    $router->get('/test', function (Request $request, Response $response) {
+        $response->setStatusCode(200)
+            ->sendText('This is a test route under /api.');
+    });
+
+    // Add a GET route: /api/users/:id
+    $router->get('/users/:id', function (Request $request, Response $response, $params) {
+        $userId = $params['id'];
+        $response->setStatusCode(200)
+            ->sendJson(["User ID" => (int) $userId]);
+    });
+
+    // Add a POST route: /api/users
+    $router->post('/users', function (Request $request, Response $response) {
+        $body = $request->getBody();
+        $data = ['message' => 'User created', 'data' => $body];
+        $response->setStatusCode(201)
+            ->sendJson($data);
+    });
+
+    // Add a GET route: /api/about
+    $router->get('/about', function (Request $request, Response $response) {
+        $html = "<h1>About Us</h1><p>This is the about page under /api.</p>";
+        $response->setStatusCode(200)
+            ->sendHtml($html);
+    });
+
+}, [new ExampleMiddleware('API Group Middleware')]);  // Apply middleware to the group
+
+// Add a route group for `/posts`
+$router->addRouteGroup('/posts', function (Router $router) {
+
+    // Add a GET route: /posts/:postId/comments/:commentId
+    $router->get('/:postId/comments/:commentId', function (Request $request, Response $response, $params) {
+        $postId = $params['postId'];
+        $commentId = $params['commentId'];
+        $response->setStatusCode(200)
+            ->sendText("Post ID: $postId, Comment ID: $commentId");
+    });
+
+}, [new ExampleMiddleware('Posts Group Middleware')]);  // Apply middleware to the group
+
+// Add a GET route: /
+$router->get('/', function (Request $request, Response $response) {
     $data = ['name' => 'John Doe'];
     echo "Route Handler: Handling the request.\n";
     $response->setStatusCode(200)
         ->render(__DIR__ . '/../views/home.php', $data);
 });
 
-$server->getRouter()->addRoute('GET', '/users/:id', function (Request $request, Response $response, $params) {
-    $userId = $params['id'];
-    $response->setStatusCode(200)
-        ->sendJson(["User ID" => (int) $userId]);
-});
-
-$server->getRouter()->addRoute('GET', '/posts/:postId/comments/:commentId', function (Request $request, Response $response, $params) {
-    $postId = $params['postId'];
-    $commentId = $params['commentId'];
-    $response->setStatusCode(200)
-        ->sendText("Post ID: $postId, Comment ID: $commentId");
-});
-
-$server->getRouter()->addRoute('POST', '/users', function (Request $request, Response $response) {
-    $body = $request->getBody();
-    $data = ['message' => 'User created', 'data' => $body];
-    $response->setStatusCode(201)
-        ->sendJson($data);
-});
-
-$server->getRouter()->addRoute('GET', '/about', function (Request $request, Response $response) {
-    $html = "<h1>About Us</h1><p>This is the about page.</p>";
-    $response->setStatusCode(200)
-        ->sendHtml($html);
-});
-
-$server->getRouter()->addRoute('GET', '/test', function (Request $request, Response $response) {
-    $response->setStatusCode(200)
-        ->sendText('This is a test route.');
-});
-
-$server->getRouter()->addRoute('OPTIONS', '/users', function (Request $request, Response $response) {
+// Add OPTIONS route: /users
+$router->options('/users', function (Request $request, Response $response) {
     $response->sendOptions(['GET', 'HEAD', 'OPTIONS']);
 });
 
-$server->getRouter()->addRoute('HEAD', '/users/:id', function (Request $request, Response $response, $params) {
+// Add HEAD route: /users/:id
+$router->head('/users/:id', function (Request $request, Response $response, $params) {
     $userId = $params['id'];
 
+    // Simulate a check for user existence
     $userExists = true;
 
     if ($userExists) {

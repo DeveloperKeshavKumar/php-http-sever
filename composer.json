@@ -2,7 +2,8 @@
     "name": "arishem/php-http-server",
     "autoload": {
         "psr-4": {
-            "PhpHttpServer\\": "src/"
+            "PhpHttpServer\\": "src/",
+             "PhpHttpServer\\Tests\\": "tests/"
         }
     },
     "authors": [
@@ -11,8 +12,11 @@
             "email": "94639526+DeveloperKeshavKumar@users.noreply.github.com"
         }
     ],
-    "require": {},
     "scripts": {
-        "dev": "php public/index.php"
+        "dev": "php public/index.php",
+        "test":"./vendor/bin/phpunit"
+    },
+    "require-dev": {
+        "phpunit/phpunit": "^11.5"
     }
 }

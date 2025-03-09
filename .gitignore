@@ -34,3 +34,6 @@ tmp/
 
 # Ignore Windows-specific files
 Thumbs.db
+
+# Ignore Cache files
+*.cache

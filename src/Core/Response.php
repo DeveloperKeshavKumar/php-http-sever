@@ -68,6 +68,16 @@ class Response
     }
 
     /**
+     * Gets response header.
+     *@param string $ name The header name.
+     * @return array The response headers.
+     */
+    public function getHeader($name)
+    {
+        return $this->headers[$name];
+    }
+
+    /**
      * Sets the response body.
      *
      * @param string $body The response body.
@@ -90,6 +100,18 @@ class Response
     }
 
     /**
+     * Appends a plain text to Body.
+     *
+     * @param string $content The text to append.
+     * @return self
+     */
+    public function appendBody($content)
+    {
+        $this->body .= $content;
+        return $this;
+    }
+
+    /**
      * Sends a plain text response.
      *
      * @param string $text The text to send.
@@ -98,7 +120,7 @@ class Response
     public function sendText($text)
     {
         return $this->setHeader('Content-Type', 'text/plain')
-                    ->setBody($text);
+            ->setBody($text);
     }
 
     /**
@@ -110,7 +132,7 @@ class Response
     public function sendJson($data)
     {
         return $this->setHeader('Content-Type', 'application/json')
-                    ->setBody(json_encode($data));
+            ->setBody(json_encode($data));
     }
 
     /**
@@ -122,7 +144,7 @@ class Response
     public function sendHtml($html)
     {
         return $this->setHeader('Content-Type', 'text/html')
-                    ->setBody($html);
+            ->setBody($html);
     }
 
     /**
@@ -134,8 +156,8 @@ class Response
     public function sendOptions($allowedMethods)
     {
         return $this->setHeader('Allow', implode(', ', $allowedMethods))
-                    ->setStatusCode(200)
-                    ->setBody('');
+            ->setStatusCode(200)
+            ->setBody('');
     }
 
     /**
@@ -147,8 +169,8 @@ class Response
     public function sendHead($contentLength = 0)
     {
         return $this->setHeader('Content-Length', $contentLength)
-                    ->setStatusCode(200)
-                    ->setBody('');
+            ->setStatusCode(200)
+            ->setBody('');
     }
 
     /**
@@ -226,15 +248,15 @@ class Response
     {
         if (file_exists($filePath)) {
             $this->setHeader('Content-Type', mime_content_type($filePath))
-                 ->setHeader('Content-Length', filesize($filePath))
-                 ->setBody(file_get_contents($filePath));
+                ->setHeader('Content-Length', filesize($filePath))
+                ->setBody(file_get_contents($filePath));
 
             foreach ($headers as $name => $value) {
                 $this->setHeader($name, $value);
             }
         } else {
             $this->setStatusCode(404)
-                 ->setBody("File not found");
+                ->setBody("File not found");
         }
         return $this;
     }
@@ -251,12 +273,12 @@ class Response
         if (file_exists($filePath)) {
             $filename = $filename ?? basename($filePath);
             $this->setHeader('Content-Type', mime_content_type($filePath))
-                 ->setHeader('Content-Disposition', 'attachment; filename="' . $filename . '"')
-                 ->setHeader('Content-Length', filesize($filePath))
-                 ->setBody(file_get_contents($filePath));
+                ->setHeader('Content-Disposition', 'attachment; filename="' . $filename . '"')
+                ->setHeader('Content-Length', filesize($filePath))
+                ->setBody(file_get_contents($filePath));
         } else {
             $this->setStatusCode(404)
-                 ->setBody("File not found");
+                ->setBody("File not found");
         }
         return $this;
     }
@@ -282,8 +304,8 @@ class Response
     public function redirect($url, $statusCode = 302)
     {
         return $this->setStatusCode($statusCode)
-                    ->setHeader('Location', $url)
-                    ->setBody('');
+            ->setHeader('Location', $url)
+            ->setBody('');
     }
 
     /**

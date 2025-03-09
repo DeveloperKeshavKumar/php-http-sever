@@ -1,69 +1,162 @@
 <?php
 
-require __DIR__ . '/../../vendor/autoload.php';
+namespace PhpHttpServer\Tests\Core;
 
+use PhpHttpServer\Core\Request;
+use PHPUnit\Framework\TestCase;
 
-// Simulate a raw HTTP request
-$rawRequest = "POST /path/to/resource?param1=value1&param2=value2 HTTP/1.1\r\n"
-    . "Host: example.com\r\n"
-    . "Content-Type: multipart/form-data; boundary=----WebKitFormBoundary7MA4YWxkTrZu0gW\r\n"
-    . "Cookie: sessionId=abc123; userId=42\r\n"
-    . "Accept: application/json\r\n"
-    . "\r\n"
-    . "------WebKitFormBoundary7MA4YWxkTrZu0gW\r\n"
-    . "Content-Disposition: form-data; name=\"file\"; filename=\"example.txt\"\r\n"
-    . "Content-Type: text/plain\r\n"
-    . "\r\n"
-    . "This is a test file.\r\n"
-    . "------WebKitFormBoundary7MA4YWxkTrZu0gW--\r\n";
+class RequestTest extends TestCase
+{
+    public function testRequestParsing()
+    {
+        $rawRequest = "GET /index.html HTTP/1.1\r\nHost: example.com\r\nCookie: name=value\r\n\r\nbody";
+        $request = new Request($rawRequest);
 
-// Create a Request object
-$request = new \PhpHttpServer\Core\Request($rawRequest);
+        $this->assertEquals('GET', $request->getMethod());
+        $this->assertEquals('/index.html', $request->getUri());
+        $this->assertEquals('HTTP/1.1', $request->getProtocol());
+        $this->assertEquals('example.com', $request->getHeader('Host'));
+        $this->assertEquals('value', $request->getCookie('name'));
+        $this->assertEquals('body', $request->getBody());
+    }
 
-// Test getters
-echo "Method: " . $request->getMethod() . "\n"; // Expected: POST
-echo "URI: " . $request->getUri() . "\n"; // Expected: /path/to/resource?param1=value1&param2=value2
-echo "Protocol: " . $request->getProtocol() . "\n"; // Expected: HTTP/1.1
-echo "Hostname: " . $request->getHostname() . "\n"; // Expected: example.com
-echo "IP: " . $request->getIp() . "\n"; // Expected: 0.0.0.0 (or the actual IP if running in a server context)
+    public function testQueryParams()
+    {
+        $rawRequest = "GET /index.html?param1=value1&param2=value2 HTTP/1.1\r\nHost: example.com\r\n\r\n";
+        $request = new Request($rawRequest);
 
-// Test headers
-echo "Headers:\n";
-print_r($request->getHeaders()); // Expected: Array of headers
-echo "Content-Type: " . $request->getHeader('Content-Type') . "\n"; // Expected: multipart/form-data; boundary=----WebKitFormBoundary7MA4YWxkTrZu0gW
+        $this->assertEquals('value1', $request->getQueryParam('param1'));
+        $this->assertEquals('value2', $request->getQueryParam('param2'));
+    }
 
-// Test query parameters
-echo "Query Parameters:\n";
-print_r($request->getQueryParams()); // Expected: Array with param1 and param2
-echo "Query Param 'param1': " . $request->getQueryParam('param1') . "\n"; // Expected: value1
+    public function testPathParams()
+    {
+        $rawRequest = "GET /users/123 HTTP/1.1\r\nHost: example.com\r\n\r\n";
+        $request = new Request($rawRequest);
+        $request->extractPathParams('~^/users/(?P<id>\d+)$~'); // Use named capture group
 
-// Test cookies
-echo "Cookies:\n";
-print_r($request->getCookies()); // Expected: Array with sessionId and userId
-echo "Cookie 'sessionId': " . $request->getCookie('sessionId') . "\n"; // Expected: abc123
+        $this->assertEquals(['id' => '123'], $request->getPathParams()); // Expect associative array
+    }
 
-// Test files
-echo "Files:\n";
-print_r($request->getFiles()); // Expected: Array with file details
-echo "File 'file' content: " . $request->getFile('file')['content'] . "\n"; // Expected: This is a test file.
+    public function testGetMethod()
+    {
+        $rawRequest = "GET / HTTP/1.1\r\nHost: example.com\r\n\r\n";
+        $request = new Request($rawRequest);
+        $this->assertTrue($request->isGet());
+        $this->assertFalse($request->isPost());
+        $this->assertFalse($request->isPut());
+        $this->assertFalse($request->isDelete());
+    }
 
-// Test body
-echo "Body: " . $request->getBody() . "\n"; // Expected: Empty (since body is part of multipart data)
+    public function testPostMethod()
+    {
+        $rawRequest = "POST /submit HTTP/1.1\r\nHost: example.com\r\n\r\n";
+        $request = new Request($rawRequest);
+        $this->assertTrue($request->isPost());
+        $this->assertFalse($request->isGet());
+    }
 
-// Test path parameters
-$request->extractPathParams('|/path/to/resource|');
-echo "Path Parameters:\n";
-print_r($request->getPathParams()); // Expected: Array with matched path segments
+    public function testPutMethod()
+    {
+        $rawRequest = "PUT /update HTTP/1.1\r\nHost: example.com\r\n\r\n";
+        $request = new Request($rawRequest);
+        $this->assertTrue($request->isPut());
+        $this->assertFalse($request->isGet());
+    }
 
-// Test request method checks
-echo "Is GET: " . ($request->isGet() ? 'Yes' : 'No') . "\n"; // Expected: No
-echo "Is POST: " . ($request->isPost() ? 'Yes' : 'No') . "\n"; // Expected: Yes
-echo "Is PUT: " . ($request->isPut() ? 'Yes' : 'No') . "\n"; // Expected: No
-echo "Is DELETE: " . ($request->isDelete() ? 'Yes' : 'No') . "\n"; // Expected: No
+    public function testDeleteMethod()
+    {
+        $rawRequest = "DELETE /delete HTTP/1.1\r\nHost: example.com\r\n\r\n";
+        $request = new Request($rawRequest);
+        $this->assertTrue($request->isDelete());
+        $this->assertFalse($request->isGet());
+    }
 
-// Test content type checks
-echo "Is multipart/form-data: " . ($request->is('multipart/form-data') ? 'Yes' : 'No') . "\n"; // Expected: Yes
-echo "Accepts application/json: " . ($request->accepts('application/json') ? 'Yes' : 'No') . "\n"; // Expected: Yes
+    public function testGetHeader()
+    {
+        $rawRequest = "GET / HTTP/1.1\r\nHost: example.com\r\nConnection: keep-alive\r\n\r\n";
+        $request = new Request($rawRequest);
+        $this->assertEquals('example.com', $request->getHeader('Host'));
+        $this->assertEquals('keep-alive', $request->getHeader('Connection'));
+        $this->assertNull($request->getHeader('Non-Existing-Header'));
+    }
 
-// Test HTTPS check
-echo "Is HTTPS: " . ($request->isHttps() ? 'Yes' : 'No') . "\n"; // Expected: No
+    public function testSetHeader()
+    {
+        $rawRequest = "GET / HTTP/1.1\r\nHost: example.com\r\n\r\n";
+        $request = new Request($rawRequest);
+        $request->setHeader('User-Agent', 'TestAgent');
+        $this->assertEquals('TestAgent', $request->getHeader('User-Agent'));
+    }
+
+    public function testIs()
+    {
+        $rawRequest = "POST /upload HTTP/1.1\r\nHost: example.com\r\nContent-Type: multipart/form-data; boundary=----WebKitFormBoundary\r\n\r\n";
+        $request = new Request($rawRequest);
+        $this->assertTrue($request->is('multipart/form-data'));
+        $this->assertFalse($request->is('application/json'));
+    }
+
+    public function testAccepts()
+    {
+        $rawRequest = "GET / HTTP/1.1\r\nHost: example.com\r\nAccept: application/json\r\n\r\n";
+        $request = new Request($rawRequest);
+        $this->assertTrue($request->accepts('application/json'));
+        $this->assertFalse($request->accepts('text/html'));
+    }
+
+    public function testIsHttps()
+    {
+        // Simulate HTTP
+        $rawRequest = "GET / HTTP/1.1\r\nHost: example.com\r\n\r\n";
+        $request = new Request($rawRequest);
+        $this->assertFalse($request->isHttps());
+
+        // Simulate HTTPS
+        $_SERVER['HTTPS'] = 'on';
+        $rawRequest = "GET / HTTP/1.1\r\nHost: example.com\r\n\r\n";
+        $request = new Request($rawRequest);
+        $this->assertTrue($request->isHttps());
+
+        // Clean up
+        unset($_SERVER['HTTPS']);
+    }
+
+    public function testGetFiles()
+    {
+        $rawRequest = "POST /upload HTTP/1.1\r\nHost: example.com\r\nContent-Type: multipart/form-data; boundary=----WebKitFormBoundary\r\n\r\n";
+        $rawRequest .= "------WebKitFormBoundary\r\nContent-Disposition: form-data; name=\"file\"; filename=\"example.txt\"\r\n\r\nTest content\r\n------WebKitFormBoundary--\r\n";
+        $request = new Request($rawRequest);
+        $files = $request->getFiles();
+
+        $this->assertCount(1, $files);
+        $this->assertEquals('example.txt', $files['file']['filename']);
+        $this->assertEquals('Test content', $files['file']['content']);
+    }
+
+    public function testGetCookies()
+    {
+        $rawRequest = "GET / HTTP/1.1\r\nHost: example.com\r\nCookie: name=value; session=12345\r\n\r\n";
+        $request = new Request($rawRequest);
+        $cookies = $request->getCookies();
+        $this->assertArrayHasKey('name', $cookies);
+        $this->assertEquals('value', $cookies['name']);
+        $this->assertArrayHasKey('session', $cookies);
+        $this->assertEquals('12345', $cookies['session']);
+    }
+
+    public function testGetIp()
+    {
+        $rawRequest = "GET / HTTP/1.1\r\nHost: example.com\r\n\r\n";
+        $_SERVER['REMOTE_ADDR'] = '192.168.1.1';
+        $request = new Request($rawRequest);
+        $this->assertEquals('192.168.1.1', $request->getIp());
+    }
+
+    public function testGetHostname()
+    {
+        $rawRequest = "GET / HTTP/1.1\r\nHost: example.com\r\n\r\n";
+        $request = new Request($rawRequest);
+        $this->assertEquals('example.com', $request->getHostname());
+    }
+}

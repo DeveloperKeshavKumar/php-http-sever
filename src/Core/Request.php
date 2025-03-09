@@ -255,10 +255,11 @@ class Request
      */
     public function extractPathParams($pattern)
     {
-        preg_match($pattern, $this->uri, $matches);
-        if ($matches) {
-            array_shift($matches); // Remove the full match
-            $this->pathParams = $matches;
+        if (preg_match($pattern, $this->uri, $matches)) {
+            // Filter out numeric keys (non-named capture groups)
+            $this->pathParams = array_filter($matches, function ($key) {
+                return is_string($key);
+            }, ARRAY_FILTER_USE_KEY);
         }
     }
 
@@ -340,7 +341,7 @@ class Request
      */
     public function getHostname()
     {
-        return $this->hostname;
+        return $this->getHeader('Host') ?? $this->hostname;
     }
 
     /**
@@ -361,7 +362,8 @@ class Request
      */
     public function is($type)
     {
-        return strpos($this->getHeader('Content-Type'), $type) !== false;
+        $contentType = $this->getHeader('Content-Type') ?? '';
+        return strpos($contentType, $type) !== false;
     }
 
     /**
@@ -372,7 +374,7 @@ class Request
      */
     public function accepts($type)
     {
-        $acceptHeader = $this->getHeader('Accept');
+        $acceptHeader = $this->getHeader('Accept') ?? '';
         return strpos($acceptHeader, $type) !== false;
     }
 
@@ -383,6 +385,6 @@ class Request
      */
     public function isHttps()
     {
-        return $this->protocol === 'HTTPS';
+        return !empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off';
     }
 }
