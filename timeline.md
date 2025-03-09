@@ -34,3 +34,64 @@
 - **Substep 7.1**: Use the custom server to create a sample project (e.g., a simple blog or chat application).
 - **Substep 7.2**: Demonstrate the use of global and route-specific middlewares.
 - **Substep 7.3**: Showcase WebSocket integration in the sample project.
+
+---
+
+```
+php-http-server/
+├── src/
+│   ├── Core/
+│   │   ├── Server.php                    # Main HTTP server logic
+│   │   ├── Request.php                   # HTTP request class
+│   │   ├── Response.php                  # HTTP response class
+│   │   ├── Router.php                    # Router class
+│   │   └── RouterInterface.php           # Router interface
+│   ├── WebSocket/
+│   │   ├── WebSocketServer.php           # WebSocket server logic
+│   │   └── WebSocketHandlerInterface.php # WebSocket handler interface
+│   ├── Middleware/
+│   │   ├── MiddlewareInterface.php       # Middleware contract
+│   │   ├── AuthMiddleware.php            # Authentication middleware
+│   │   ├── MiddlewareStack.php           # Middleware stack handler
+│   │   └── ExampleMiddleware.php         # Example middleware
+│   ├── Cache/
+│   │   └── Cache.php                     # In-memory caching system
+│   ├── Exceptions/
+│   │   ├── HttpException.php             # Base HTTP exception
+│   │   ├── NotFoundException.php         # 404 Not Found exception
+│   │   └── UnauthorizedException.php     # 401 Unauthorized exception
+│   └── Utils/
+│       ├── FileUploader.php              # File upload handler
+│       └── Logger.php                    # Logging utility
+├── public/
+│   ├── index.php                         # Entry point for the server
+│   ├── assets/                           # Static assets (CSS, JS, images)
+│   │   ├── css/
+│   │   ├── js/
+│   │   └── images/
+│   └── uploads/                          # Directory for uploaded files
+├── views/                                # Template files for rendering HTML
+│   ├── home.php                          # Home page template
+│   ├── about.php                         # About page template
+│   └── error.php                         # Error page template
+├── config/                               # Configuration files
+│   ├── server.php                        # Server configuration (host, port, etc.)
+│   └── routes.php                        # Route definitions
+├── tests/                                # Unit tests
+│   ├── Core/
+│   │   ├── RequestTest.php
+│   │   ├── ResponseTest.php
+│   │   ├── RouterTest.php
+│   │   └── ServerTest.php
+│   ├── Middleware/
+│   │   ├── AuthMiddlewareTest.php
+│   │   └── LoggingMiddlewareTest.php
+│   └── WebSocket/
+│       └── WebSocketServerTest.php
+├── logs/                                 # Log files
+│   └── server.log                        # Server activity log
+├── vendor/                               # Composer dependencies (if any)
+├── composer.json                         # Composer configuration (optional)
+├── README.md                             # Project documentation
+└── .htaccess                             # Apache configuration (if needed)
+```

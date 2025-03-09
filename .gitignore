@@ -35,5 +35,8 @@ tmp/
 # Ignore Windows-specific files
 Thumbs.db
 
-# Ignore Cache files
+# Ignore Cache, Logs, Uploads files
+cache/
+logs/
+uploads/
 *.cache
