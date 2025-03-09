@@ -22,6 +22,8 @@ class Router implements RouterInterface
 
     private static $compiledPatterns = [];  // Cache for compiled route patterns
 
+    private $currentPrefix = '';
+
     /**
      * Adds a GET route.
      */
@@ -118,7 +120,6 @@ class Router implements RouterInterface
         ];
     }
 
-
     /**
      * Compiles a route URI into a regex pattern.
      */
@@ -177,7 +178,6 @@ class Router implements RouterInterface
         array_pop($this->middlewareStack);
     }
 
-
     /**
      * Matches the incoming request URI to a registered route.
      */
@@ -229,7 +229,7 @@ class Router implements RouterInterface
                     $params[$key] = $value;
                 }
             }
-            error_log("Matched URI: $requestUri with params: " . json_encode($params)); // Debugging
+
             return true;
         }
         return false;
@@ -268,7 +268,7 @@ class Router implements RouterInterface
             return;
         }
 
-        // Define the final handler
+        // Define the final handler (the route handler)
         $finalHandler = function ($request, $response) use ($matchedRoute) {
             call_user_func($matchedRoute['handler'], $request, $response, $matchedRoute['params']);
         };
@@ -276,7 +276,7 @@ class Router implements RouterInterface
         // Merge global middleware with route-specific middleware
         $middlewareList = array_merge($this->globalMiddleware, $matchedRoute['middleware']);
 
-        // Apply middleware pipeline
+        // Apply the middleware pipeline
         $this->applyMiddleware($middlewareList, $request, $response, $finalHandler);
     }
 
@@ -287,13 +287,14 @@ class Router implements RouterInterface
     {
         // Create a pipeline of middleware
         $pipeline = array_reduce(
-            array_reverse($middlewareList),
+            array_reverse($middlewareList), // Reverse the middleware list to build the pipeline correctly
             function ($next, $middleware) {
                 return function ($request, $response) use ($middleware, $next) {
+                    // Execute the middleware and pass the next handler
                     return $middleware($request, $response, $next);
                 };
             },
-            $finalHandler
+            $finalHandler // The final handler is the route handler
         );
 
         // Start the middleware pipeline
