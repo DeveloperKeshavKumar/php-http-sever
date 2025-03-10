@@ -4,6 +4,7 @@ namespace PhpHttpServer\Core;
 
 use PhpHttpServer\WebSocket\WebSocketHandlerInterface;
 use PhpHttpServer\Middleware\MiddlewareStack;
+use PhpHttpServer\Cache\CacheInterface;
 
 class Server
 {
@@ -14,19 +15,22 @@ class Server
     private $middlewareStack;
     private $webSocketHandler;
     private $clients = [];
+    private $cache;
 
     public function __construct(
         $host = '0.0.0.0',
         $port = 8080,
         RouterInterface $router,
         array $middlewareStack = [],
-        WebSocketHandlerInterface $webSocketHandler = null
+        WebSocketHandlerInterface $webSocketHandler = null,
+        CacheInterface $cache = null
     ) {
         $this->host = $host;
         $this->port = $port;
         $this->router = $router;
         $this->middlewareStack = $middlewareStack;
         $this->webSocketHandler = $webSocketHandler;
+        $this->cache = $cache;
     }
 
     public function getRouter()
@@ -124,6 +128,18 @@ class Server
         $route = $this->router->match($request->getMethod(), $request->getUri());
 
         if ($route) {
+            // Generate a unique cache key for the request
+            $cacheKey = $request->getMethod() . ':' . $request->getUri();
+
+            // Try to get the response from the cache
+            $cachedResponse = $this->cache->get($cacheKey);
+
+            if ($cachedResponse !== null) {
+                // Serve the cached response
+                $cachedResponse->send($conn);
+                return;
+            }
+
             $response = new Response();
 
             // Combine global and route-specific middleware
@@ -139,6 +155,9 @@ class Server
             $middlewareStack->execute($request, $response, function (Request $request, Response $response) use ($route) {
                 call_user_func_array($route['handler'], [$request, $response, $route['params']]);
             });
+
+            // Cache the response for future requests
+            $this->cache->set($cacheKey, $response, 60); // Cache for 60 seconds
 
             // Send the response
             $response->send($conn);
