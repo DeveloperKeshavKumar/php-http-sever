@@ -10,7 +10,7 @@ class WebSocketServer implements WebSocketHandlerInterface
     private $shmId;
     private $shmSize = 1024; // Size of shared memory block
     private $clientResources = []; // In-memory mapping of client IDs to resources
-    private $nextClientId = 1; // Auto-incrementing client ID
+    private const NEXT_CLIENT_ID_SIZE = 10; // Bytes reserved for next_client_id
 
     public function __construct()
     {
@@ -37,6 +37,30 @@ class WebSocketServer implements WebSocketHandlerInterface
     {
         shmop_write($this->shmId, str_repeat("\0", $this->shmSize), 0);
         echo "Shared memory cleared.\n";
+    }
+
+    /**
+     * Get the next client ID from shared memory.
+     *
+     * @return int The next client ID.
+     */
+    private function getNextClientId()
+    {
+        // Read the next_client_id from the reserved space in shared memory
+        $nextClientIdData = shmop_read($this->shmId, 0, self::NEXT_CLIENT_ID_SIZE);
+        $nextClientId = (int) rtrim($nextClientIdData, "\0");
+
+        // If next_client_id is 0 (initial state), set it to 1
+        if ($nextClientId === 0) {
+            $nextClientId = 1;
+        }
+
+        // Increment the next_client_id and save it back to shared memory
+        $nextClientId++;
+        shmop_write($this->shmId, str_pad($nextClientId, self::NEXT_CLIENT_ID_SIZE, "\0"), 0);
+
+        echo "Assigned new client ID: " . ($nextClientId - 1) . "\n";
+        return $nextClientId - 1; // Return the current client ID (before incrementing)
     }
 
     /**
@@ -85,6 +109,7 @@ class WebSocketServer implements WebSocketHandlerInterface
 
         // Add the connection to the shared memory
         $clientId = $this->addClient($conn);
+        echo "Client $clientId connected to the server.\n";
 
         // Main WebSocket loop
         while (true) {
@@ -92,7 +117,7 @@ class WebSocketServer implements WebSocketHandlerInterface
             $frame = fread($conn, 8192);
 
             if ($frame === false || $frame === '') {
-                echo "WebSocket connection closed by client.\n";
+                echo "WebSocket connection closed by client $clientId.\n";
                 break;
             }
 
@@ -100,7 +125,7 @@ class WebSocketServer implements WebSocketHandlerInterface
             $decodedFrame = $this->decodeWebSocketFrame($frame);
 
             if ($decodedFrame === null) {
-                echo "Invalid WebSocket frame received.\n";
+                echo "Invalid WebSocket frame received from client $clientId.\n";
                 break;
             }
 
@@ -120,6 +145,7 @@ class WebSocketServer implements WebSocketHandlerInterface
 
         // Remove the connection from the shared memory
         $this->removeClient($clientId);
+        echo "Client $clientId exited the server.\n";
 
         // Close the WebSocket connection
         fclose($conn);
@@ -134,7 +160,7 @@ class WebSocketServer implements WebSocketHandlerInterface
      */
     private function addClient($conn)
     {
-        $clientId = $this->nextClientId++;
+        $clientId = $this->getNextClientId();
         $this->clientResources[$clientId] = $conn;
 
         $clients = $this->getClients();
@@ -142,6 +168,7 @@ class WebSocketServer implements WebSocketHandlerInterface
         $this->saveClients($clients);
 
         echo "New client added. Total clients: " . count($clients) . "\n";
+        echo "Stored client $clientId in shared memory.\n";
         return $clientId;
     }
 
@@ -161,6 +188,7 @@ class WebSocketServer implements WebSocketHandlerInterface
         unset($this->clientResources[$clientId]);
 
         echo "Client removed. Total clients: " . count($clients) . "\n";
+        echo "Removed client $clientId from shared memory.\n";
     }
 
     /**
@@ -170,9 +198,8 @@ class WebSocketServer implements WebSocketHandlerInterface
      */
     private function getClients()
     {
-        $data = shmop_read($this->shmId, 0, $this->shmSize);
-
-        // Remove null bytes from the end of the data
+        // Read the clients data from shared memory (skip the reserved space for next_client_id)
+        $data = shmop_read($this->shmId, self::NEXT_CLIENT_ID_SIZE, $this->shmSize - self::NEXT_CLIENT_ID_SIZE);
         $data = rtrim($data, "\0");
 
         // Check if the data is empty or invalid
@@ -203,7 +230,8 @@ class WebSocketServer implements WebSocketHandlerInterface
         echo "Serialized data to save:\n";
         var_dump($data);
 
-        shmop_write($this->shmId, $data, 0);
+        // Write the clients data to shared memory (skip the reserved space for next_client_id)
+        shmop_write($this->shmId, $data, self::NEXT_CLIENT_ID_SIZE);
         echo "Clients saved to shared memory.\n";
     }
 
@@ -219,7 +247,7 @@ class WebSocketServer implements WebSocketHandlerInterface
         echo "Broadcasting message to " . count($clients) . " clients.\n";
 
         foreach ($clients as $clientId) {
-            if (isset($this->clientResources[$clientId]) && is_resource($this->clientResources[$clientId])) {
+            if (isset($this->clientResources[$clientId])) {
                 $frame = $this->encodeWebSocketFrame($message);
                 fwrite($this->clientResources[$clientId], $frame);
                 echo "Message broadcasted to client $clientId.\n";
