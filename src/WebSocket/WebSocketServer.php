@@ -9,20 +9,34 @@ class WebSocketServer implements WebSocketHandlerInterface
 {
     private $shmId;
     private $shmSize = 1024; // Size of shared memory block
+    private $clientResources = []; // In-memory mapping of client IDs to resources
+    private $nextClientId = 1; // Auto-incrementing client ID
 
     public function __construct()
     {
-        // Create a shared memory block
+        // Create or open a shared memory block
         $this->shmId = shmop_open(ftok(__FILE__, 't'), "c", 0644, $this->shmSize);
         if (!$this->shmId) {
             die("Failed to create shared memory block\n");
         }
+
+        // Clear shared memory on server start
+        $this->clearSharedMemory();
     }
 
     public function __destruct()
     {
         // Close the shared memory block
         shmop_close($this->shmId);
+    }
+
+    /**
+     * Clear the shared memory block.
+     */
+    private function clearSharedMemory()
+    {
+        shmop_write($this->shmId, str_repeat("\0", $this->shmSize), 0);
+        echo "Shared memory cleared.\n";
     }
 
     /**
@@ -70,7 +84,7 @@ class WebSocketServer implements WebSocketHandlerInterface
         echo "WebSocket connection established.\n";
 
         // Add the connection to the shared memory
-        $this->addClient($conn);
+        $clientId = $this->addClient($conn);
 
         // Main WebSocket loop
         while (true) {
@@ -91,72 +105,106 @@ class WebSocketServer implements WebSocketHandlerInterface
             }
 
             // Log the decoded frame
-            echo "Received WebSocket frame:\n";
+            echo "Received WebSocket frame from client $clientId:\n";
             echo "Opcode: " . $decodedFrame['opcode'] . "\n";
             echo "Payload: " . $decodedFrame['payload'] . "\n";
 
             // Send a response back to the client
             $responseFrame = $this->encodeWebSocketFrame("Server received: " . $decodedFrame['payload']);
             fwrite($conn, $responseFrame);
+            echo "Sent response to client $clientId.\n";
 
             // Broadcast the message to all clients
             $this->broadcast($decodedFrame['payload']);
         }
 
         // Remove the connection from the shared memory
-        $this->removeClient($conn);
+        $this->removeClient($clientId);
 
         // Close the WebSocket connection
         fclose($conn);
-        echo "WebSocket connection closed.\n";
+        echo "WebSocket connection closed for client $clientId.\n";
     }
 
     /**
      * Add a client to the shared memory.
      *
      * @param resource $conn The connection resource.
+     * @return int The client ID.
      */
     private function addClient($conn)
     {
+        $clientId = $this->nextClientId++;
+        $this->clientResources[$clientId] = $conn;
+
         $clients = $this->getClients();
-        $clients[] = $conn;
+        $clients[] = $clientId;
         $this->saveClients($clients);
+
+        echo "New client added. Total clients: " . count($clients) . "\n";
+        return $clientId;
     }
 
     /**
      * Remove a client from the shared memory.
      *
-     * @param resource $conn The connection resource.
+     * @param int $clientId The client ID.
      */
-    private function removeClient($conn)
+    private function removeClient($clientId)
     {
         $clients = $this->getClients();
-        $clients = array_filter($clients, function ($client) use ($conn) {
-            return $client !== $conn;
+        $clients = array_filter($clients, function ($id) use ($clientId) {
+            return $id !== $clientId;
         });
         $this->saveClients($clients);
+
+        unset($this->clientResources[$clientId]);
+
+        echo "Client removed. Total clients: " . count($clients) . "\n";
     }
 
     /**
      * Get the list of clients from shared memory.
      *
-     * @return array The list of clients.
+     * @return array The list of client IDs.
      */
     private function getClients()
     {
         $data = shmop_read($this->shmId, 0, $this->shmSize);
-        return unserialize($data) ?: [];
+
+        // Remove null bytes from the end of the data
+        $data = rtrim($data, "\0");
+
+        // Check if the data is empty or invalid
+        if (empty($data) || @unserialize($data) === false) {
+            echo "No valid clients data found in shared memory.\n";
+            return [];
+        }
+
+        $clients = unserialize($data);
+
+        // Debugging: Log the deserialized clients array
+        echo "Deserialized clients:\n";
+        print_r($clients);
+
+        return $clients;
     }
 
     /**
      * Save the list of clients to shared memory.
      *
-     * @param array $clients The list of clients.
+     * @param array $clients The list of client IDs.
      */
     private function saveClients($clients)
     {
         $data = serialize($clients);
+
+        // Debugging: Log the serialized data
+        echo "Serialized data to save:\n";
+        var_dump($data);
+
         shmop_write($this->shmId, $data, 0);
+        echo "Clients saved to shared memory.\n";
     }
 
     /**
@@ -167,12 +215,20 @@ class WebSocketServer implements WebSocketHandlerInterface
     public function broadcast($message)
     {
         $clients = $this->getClients();
-        foreach ($clients as $client) {
-            if (is_resource($client)) {
+
+        echo "Broadcasting message to " . count($clients) . " clients.\n";
+
+        foreach ($clients as $clientId) {
+            if (isset($this->clientResources[$clientId]) && is_resource($this->clientResources[$clientId])) {
                 $frame = $this->encodeWebSocketFrame($message);
-                fwrite($client, $frame);
+                fwrite($this->clientResources[$clientId], $frame);
+                echo "Message broadcasted to client $clientId.\n";
+            } else {
+                echo "Invalid client resource for ID $clientId.\n";
             }
         }
+
+        echo "Broadcasting done!!\n";
     }
 
     /**
