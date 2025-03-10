@@ -7,6 +7,24 @@ use PhpHttpServer\Core\Response;
 
 class WebSocketServer implements WebSocketHandlerInterface
 {
+    private $shmId;
+    private $shmSize = 1024; // Size of shared memory block
+
+    public function __construct()
+    {
+        // Create a shared memory block
+        $this->shmId = shmop_open(ftok(__FILE__, 't'), "c", 0644, $this->shmSize);
+        if (!$this->shmId) {
+            die("Failed to create shared memory block\n");
+        }
+    }
+
+    public function __destruct()
+    {
+        // Close the shared memory block
+        shmop_close($this->shmId);
+    }
+
     /**
      * Perform the WebSocket handshake.
      *
@@ -51,6 +69,9 @@ class WebSocketServer implements WebSocketHandlerInterface
     {
         echo "WebSocket connection established.\n";
 
+        // Add the connection to the shared memory
+        $this->addClient($conn);
+
         // Main WebSocket loop
         while (true) {
             // Read a WebSocket frame from the client
@@ -77,11 +98,81 @@ class WebSocketServer implements WebSocketHandlerInterface
             // Send a response back to the client
             $responseFrame = $this->encodeWebSocketFrame("Server received: " . $decodedFrame['payload']);
             fwrite($conn, $responseFrame);
+
+            // Broadcast the message to all clients
+            $this->broadcast($decodedFrame['payload']);
         }
+
+        // Remove the connection from the shared memory
+        $this->removeClient($conn);
 
         // Close the WebSocket connection
         fclose($conn);
         echo "WebSocket connection closed.\n";
+    }
+
+    /**
+     * Add a client to the shared memory.
+     *
+     * @param resource $conn The connection resource.
+     */
+    private function addClient($conn)
+    {
+        $clients = $this->getClients();
+        $clients[] = $conn;
+        $this->saveClients($clients);
+    }
+
+    /**
+     * Remove a client from the shared memory.
+     *
+     * @param resource $conn The connection resource.
+     */
+    private function removeClient($conn)
+    {
+        $clients = $this->getClients();
+        $clients = array_filter($clients, function ($client) use ($conn) {
+            return $client !== $conn;
+        });
+        $this->saveClients($clients);
+    }
+
+    /**
+     * Get the list of clients from shared memory.
+     *
+     * @return array The list of clients.
+     */
+    private function getClients()
+    {
+        $data = shmop_read($this->shmId, 0, $this->shmSize);
+        return unserialize($data) ?: [];
+    }
+
+    /**
+     * Save the list of clients to shared memory.
+     *
+     * @param array $clients The list of clients.
+     */
+    private function saveClients($clients)
+    {
+        $data = serialize($clients);
+        shmop_write($this->shmId, $data, 0);
+    }
+
+    /**
+     * Broadcast a message to all connected clients.
+     *
+     * @param string $message The message to broadcast.
+     */
+    public function broadcast($message)
+    {
+        $clients = $this->getClients();
+        foreach ($clients as $client) {
+            if (is_resource($client)) {
+                $frame = $this->encodeWebSocketFrame($message);
+                fwrite($client, $frame);
+            }
+        }
     }
 
     /**
