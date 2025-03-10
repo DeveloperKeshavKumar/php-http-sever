@@ -5,6 +5,7 @@ namespace PhpHttpServer\Core;
 use PhpHttpServer\WebSocket\WebSocketHandlerInterface;
 use PhpHttpServer\Middleware\MiddlewareStack;
 use PhpHttpServer\Cache\CacheInterface;
+use PhpHttpServer\Cache\Cache;
 
 class Server
 {
@@ -30,7 +31,7 @@ class Server
         $this->router = $router;
         $this->middlewareStack = $middlewareStack;
         $this->webSocketHandler = $webSocketHandler;
-        $this->cache = $cache;
+        $this->cache = $cache ?? new Cache();
     }
 
     public function getRouter()
