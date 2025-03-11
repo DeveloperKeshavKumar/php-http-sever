@@ -1,5 +1,4 @@
-
-# PHP HTTP Server
+# PHP HTTP Server [![Latest Version on Packagist](https://img.shields.io/packagist/v/arishem/php-http-server.svg?style=flat-square)](https://packagist.org/packages/arishem/php-http-server)
 
 A lightweight, dependency-free HTTP server written in PHP. This server supports basic routing, middleware, and WebSocket integration, and is designed to be modular and easy to extend.
 
@@ -18,7 +17,7 @@ A lightweight, dependency-free HTTP server written in PHP. This server supports 
 
 ### Prerequisites
 
-- PHP 7.4 or higher.
+- PHP 8.3 or higher.
 - Basic knowledge of PHP and HTTP.
 
 ### Installation
@@ -58,56 +57,7 @@ To start the server, run:
 
 The server will listen on `http://localhost:8080` by default. You can customize the host and port by modifying the `Server` constructor in `public/index.php`.
 
----
-
-### Handling Requests
-
-The server parses incoming HTTP requests into a `Request` object, which provides the following methods:
-
-- `getMethod()`: Returns the HTTP method (e.g., `GET`, `POST`).
-- `getUri()`: Returns the request URI (e.g., `/`, `/users/123`).
-- `getHeaders()`: Returns an associative array of request headers.
-- `getBody()`: Returns the request body (if any).
-
-Example:
-
-```php
-$request = new Request($rawRequest);
-echo "Method: " . $request->getMethod() . "\n";
-echo "URI: " . $request->getUri() . "\n";
-echo "Headers: " . print_r($request->getHeaders(), true) . "\n";
-echo "Body: " . $request->getBody() . "\n";
-```
-
----
-
-### Sending Responses
-
-The server uses a `Response` object to send HTTP responses. The `Response` class provides the following methods:
-
-- `setStatusCode(int $statusCode)`: Sets the HTTP status code (e.g., `200`, `404`).
-- `setHeader(string $name, string $value)`: Adds a header to the response.
-- `setBody(string $body)`: Sets the response body.
-- `send(resource $conn)`: Sends the response to the client.
-
-Example:
-
-```php
-$response = new Response();
-$response->setStatusCode(200)
-         ->setHeader('Content-Type', 'text/plain')
-         ->setBody('Hello, World!')
-         ->send($conn);
-```
-
----
-
-### Example Workflow
-
-1. The server accepts a connection and reads the raw HTTP request.
-2. The raw request is parsed into a `Request` object.
-3. The server processes the request and creates a `Response` object.
-4. The response is sent back to the client, and the connection is closed.
+The WebSocket server, if configured, will listen on `ws://localhost:8081` by default.
 
 ---
 
@@ -115,24 +65,35 @@ $response->setStatusCode(200)
 
 ```
 php-http-server/
-├── src/
-│   ├── Core/
-│   │   ├── Server.php                    # Main HTTP server logic
-│   │   ├── Request.php                   # HTTP request class
-│   │   ├── Response.php                  # HTTP response class
-│   │   ├── Router.php                    # HTTP response class
-│   │   └── RouterInterface.php           # Router interface
-│   ├── WebSocket/
-│   │   ├── WebSocketServer.php           # WebSocket server logic
-│   │   └── WebSocketInterface.php        # WebSocket frame handling logic
-│   ├── Middleware/
-│   │   ├── MiddlewareInterface.php       # Middleware contract
-│   │   ├── ModifyRequestResponseMiddleware.php       # Middleware to modify Request and Response
-│   │   └── ExampleMiddleware.php         # Example middleware
-├── public/
-│   └── index.php               # Entry point for the server
-├── composer.json               # Composer configuration (optional, for autoloading)
-└── README.md                   # Project documentation
+├── src/                             # Source code directory
+│   ├── Core/                        # Core server logic
+│   │   ├── Server.php               # Main HTTP server logic
+│   │   ├── Request.php              # HTTP request class
+│   │   ├── Response.php             # HTTP response class
+│   │   ├── Router.php               # HTTP routing logic
+│   │   └── RouterInterface.php      # Router interface
+│   ├── WebSocket/                   # WebSocket server implementation
+│   │   ├── WebSocketServer.php      # WebSocket server logic
+│   │   └── WebSocketInterface.php   # WebSocket frame handling logic
+│   ├── Middleware/                   # Middleware components
+│   │   ├── MiddlewareInterface.php  # Middleware contract
+│   │   ├── ModifyRequestResponseMiddleware.php  # Middleware to modify Request and Response
+│   │   └── ExampleMiddleware.php    # Example middleware
+├── public/                          # Public directory (entry point for the server)
+│   └── index.php                    # Entry point for the server
+├── tests/                           # Test cases directory
+│   ├── Core/                        # Tests for core components
+│   │   ├── RequestTest.php          # Unit test for Request
+│   │   ├── ResponseTest.php         # Unit test for Response
+│   │   ├── RouterTest.php           # Unit test for Router
+│   │   └── test_template.php        # Test template
+│   ├── Cache/                       # Cache-related tests
+│   │   ├── test_cache               # Cache test cases
+│   │   └── CacheTest.php            # Unit test for cache functionality
+│   └── Middleware/                   # Middleware-related tests
+│       └── TestMiddleware.php       # Example middleware test
+├── composer.json                    # Composer configuration (optional, for autoloading)
+└── README.md                        # Project documentation
 ```
 
 ---

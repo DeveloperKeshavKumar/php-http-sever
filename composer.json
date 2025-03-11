@@ -1,6 +1,16 @@
 {
     "name": "arishem/php-http-server",
+    "description": "A lightweight, in-house PHP HTTP server with WebSocket support.",
     "version": "1.0.0",
+    "type": "library",
+    "keywords": [
+        "http-server",
+        "websocket",
+        "php",
+        "middleware",
+        "router"
+    ],
+    "license": "MIT",
     "minimum-stability": "dev",
     "prefer-stable": true,
     "autoload": {
@@ -12,7 +22,7 @@
     "authors": [
         {
             "name": "Keshav Kumar",
-            "email": "94639526@users.noreply.github.com"
+            "email": "94639526+developerkeshavkumar@users.noreply.github.com"
         }
     ],
     "scripts": {
@@ -29,6 +39,6 @@
     },
     "repository": {
         "type": "git",
-        "url": "git://github.com/yourusername/php-http-server.git"
+        "url": "git://github.com/developerkeshavkumar/php-http-server.git"
     }
 }
