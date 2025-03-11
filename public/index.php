@@ -10,6 +10,10 @@ use PhpHttpServer\Middleware\ExampleMiddleware;
 use PhpHttpServer\Middleware\ModifyRequestResponseMiddleware;
 use PhpHttpServer\WebSocket\WebSocketServer;
 
+if (!extension_loaded('pcntl')) {
+    die('The pcntl extension is not available. You need to install it to fork processes.');
+}
+
 // Initialize the router
 $router = new Router();
 

@@ -124,7 +124,7 @@ php-http-server/
 │   │   └── RouterInterface.php           # Router interface
 │   ├── WebSocket/
 │   │   ├── WebSocketServer.php           # WebSocket server logic
-│   │   └── WebSocketHandlerInterface.php # WebSocket frame handling logic
+│   │   └── WebSocketInterface.php        # WebSocket frame handling logic
 │   ├── Middleware/
 │   │   ├── MiddlewareInterface.php       # Middleware contract
 │   │   ├── ModifyRequestResponseMiddleware.php       # Middleware to modify Request and Response

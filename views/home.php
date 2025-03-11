@@ -15,7 +15,7 @@
     <div id="messages"></div>
 
     <script>
-        const ws = new WebSocket('ws://localhost:8080');
+        const ws = new WebSocket('ws://localhost:8081');
 
         let isWebSocketOpen = false;
 
