@@ -18,6 +18,8 @@ class Server
     private $clients = [];
     private $cache;
     private $webSocketPid;
+    private $running = true;
+    private $socketClosed = false; // Track if the socket has been closed
 
     public function __construct(
         $host = '0.0.0.0',
@@ -42,6 +44,10 @@ class Server
 
     public function start()
     {
+        // Register signal handlers for SIGINT and SIGTERM
+        pcntl_signal(SIGINT, [$this, 'stop']);  // Handle Ctrl+C
+        pcntl_signal(SIGTERM, [$this, 'stop']); // Handle termination signals
+
         // Create a TCP/IP socket
         $this->socket = socket_create(AF_INET, SOCK_STREAM, SOL_TCP);
         if ($this->socket === false) {
@@ -71,14 +77,32 @@ class Server
         $this->clients[] = $this->socket;
 
         // Main server loop
-        while (true) {
+        while ($this->running) {
+            // Dispatch any pending signals
+            pcntl_signal_dispatch();
+
             // Prepare the read array with the server socket and all client sockets
             $read = array_merge([$this->socket], $this->clients);
             $write = $except = null;
 
             // Use socket_select to monitor sockets for activity
-            if (socket_select($read, $write, $except, null) === false) {
-                die("socket_select failed: " . socket_strerror(socket_last_error()) . "\n");
+            $result = @socket_select($read, $write, $except, 1); // 1-second timeout
+
+            if ($result === false) {
+                $error = socket_last_error();
+                if ($error === SOCKET_EINTR) {
+                    // Interrupted by a signal, continue the loop
+                    continue;
+                }
+                die("socket_select failed: " . socket_strerror($error) . "\n");
+            }
+
+            if ($result === 0) {
+                // Timeout, check if we should stop
+                if (!$this->running) {
+                    break;
+                }
+                continue;
             }
 
             foreach ($read as $conn) {
@@ -133,6 +157,9 @@ class Server
                 }
             }
         }
+
+        // Clean up resources
+        $this->stop();
     }
 
     private function startWebSocketServer()
@@ -205,14 +232,33 @@ class Server
 
     public function stop()
     {
-        if ($this->socket) {
-            socket_close($this->socket);
-            echo "Server stopped.\n";
+        if (!$this->running) {
+            return;
         }
 
+        $this->running = false;
+
+        // Close all client connections
+        foreach ($this->clients as $client) {
+            if ($client !== $this->socket) {
+                socket_close($client);
+                echo "Client connection closed.\n";
+            }
+        }
+
+        // Close the server socket only if it hasn't been closed already
+        if ($this->socket && !$this->socketClosed) {
+            socket_close($this->socket);
+            $this->socketClosed = true; // Mark the socket as closed
+            echo "Server socket closed.\n";
+        }
+
+        // Terminate the WebSocket server process
         if ($this->webSocketPid) {
             posix_kill($this->webSocketPid, SIGTERM);
-            echo "WebSocket server stopped.\n";
         }
+
+        // Exit the script
+        exit(0);
     }
 }

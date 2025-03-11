@@ -8,6 +8,8 @@ class WebSocketServer implements WebSocketInterface
     private $port;
     private $socket;
     private $clients = [];
+    private $running = true;
+    private $socketClosed = false;
 
     public function __construct($host = '0.0.0.0', $port = 8081)
     {
@@ -17,6 +19,10 @@ class WebSocketServer implements WebSocketInterface
 
     public function start()
     {
+        // Register signal handlers for SIGINT and SIGTERM
+        pcntl_signal(SIGINT, [$this, 'stop']);  // Handle Ctrl+C
+        pcntl_signal(SIGTERM, [$this, 'stop']); // Handle termination signals
+
         // Create a TCP/IP socket
         $this->socket = socket_create(AF_INET, SOCK_STREAM, SOL_TCP);
         if ($this->socket === false) {
@@ -39,14 +45,32 @@ class WebSocketServer implements WebSocketInterface
         echo "WebSocket server started on ws://{$this->host}:{$this->port}\n";
 
         // Main server loop
-        while (true) {
+        while ($this->running) {
+            // Dispatch any pending signals
+            pcntl_signal_dispatch();
+
             // Prepare the read array with the server socket and all client sockets
             $read = array_merge([$this->socket], $this->clients);
             $write = $except = null;
 
             // Use socket_select to monitor sockets for activity
-            if (socket_select($read, $write, $except, null) === false) {
-                die("socket_select failed: " . socket_strerror(socket_last_error()) . "\n");
+            $result = @socket_select($read, $write, $except, 1); // 1-second timeout
+
+            if ($result === false) {
+                $error = socket_last_error();
+                if ($error === SOCKET_EINTR) {
+                    // Interrupted by a signal, continue the loop
+                    continue;
+                }
+                die("socket_select failed: " . socket_strerror($error) . "\n");
+            }
+
+            if ($result === 0) {
+                // Timeout, check if we should stop
+                if (!$this->running) {
+                    break;
+                }
+                continue;
             }
 
             // Handle new connections
@@ -103,18 +127,20 @@ class WebSocketServer implements WebSocketInterface
                 $this->broadcast($decodedFrame['payload']);
             }
         }
+
+        // Clean up resources
+        $this->stop();
     }
 
     public function handleConnection($socket)
     {
         $this->clients[] = $socket;
 
-        while (true) {
-
-            $data = socket_read($socket, 8192, PHP_BINARY_READ);
-            if ($data === false) {
-                echo "socket_read failed: " . socket_strerror(socket_last_error()) . "\n";
-                $this->removeClient($socket);
+        foreach ($this->clients as $client) {
+            $data = @socket_read($client, 8192, PHP_BINARY_READ);
+            if ($data === false || $data === '') {
+                // Client disconnected
+                $this->removeClient($client);
                 continue;
             }
 
@@ -122,8 +148,15 @@ class WebSocketServer implements WebSocketInterface
             $decodedFrame = $this->decodeWebSocketFrame($data);
             if ($decodedFrame === null) {
                 echo "Invalid WebSocket frame received.\n";
-                $this->removeClient($socket);
-                break;
+                $this->removeClient($client);
+                continue;
+            }
+
+            // Handle close frame from the client
+            if ($decodedFrame['opcode'] === 0x8) { // 0x8 = close frame
+                echo "Client sent a close frame. Closing connection.\n";
+                $this->removeClient($client);
+                continue;
             }
 
             // Log the decoded frame
@@ -133,7 +166,16 @@ class WebSocketServer implements WebSocketInterface
 
             // Send a response back to the client
             $responseFrame = $this->encodeWebSocketFrame("Server received: " . $decodedFrame['payload']);
-            @socket_write($socket, $responseFrame, strlen($responseFrame)); // Suppress warnings
+            if (!@socket_write($client, $responseFrame, strlen($responseFrame))) {
+                $error = socket_last_error($client);
+                if ($error === SOCKET_EPIPE) {
+                    echo "Socket is already closed may be by client. Skipping response.\n";
+                } else {
+                    echo "socket_write failed: " . socket_strerror($error) . "\n";
+                }
+                $this->removeClient($client);
+                continue;
+            }
             echo "Sent response to client.\n";
 
             // Broadcast the message to all clients
@@ -149,10 +191,6 @@ class WebSocketServer implements WebSocketInterface
             echo "Empty handshake request.\n";
             return false;
         }
-
-        // Debug: Output the handshake request
-        echo "Handshake request received:\n";
-        echo $request . "\n";
 
         // Extract the WebSocket key from the request headers
         if (preg_match('/Sec-WebSocket-Key: (.*)\r\n/', $request, $matches)) {
@@ -171,10 +209,6 @@ class WebSocketServer implements WebSocketInterface
         $response .= "Connection: Upgrade\r\n";
         $response .= "Sec-WebSocket-Accept: $acceptKey\r\n\r\n";
 
-        // Debug: Output the handshake response
-        echo "Handshake response:\n";
-        echo $response . "\n";
-
         // Send the handshake response
         if (!socket_write($socket, $response, strlen($response))) {
             echo "Failed to send handshake response.\n";
@@ -189,8 +223,14 @@ class WebSocketServer implements WebSocketInterface
     {
         $index = array_search($socket, $this->clients);
         if ($index !== false) {
-            unset($this->clients[$index]);
+            // Send a close frame before closing the connection
+            $this->sendCloseFrame($socket, 1000, 'Server closing connection');
+
+            // Close the socket
             socket_close($socket);
+
+            // Remove the client from the clients array
+            unset($this->clients[$index]);
             echo "Client removed. Total clients: " . count($this->clients) . "\n";
         }
     }
@@ -255,13 +295,13 @@ class WebSocketServer implements WebSocketInterface
         return $unmaskedPayload;
     }
 
-    public function encodeWebSocketFrame($payload)
+    public function encodeWebSocketFrame($payload, $opcode = 0x81)
     {
         $frame = '';
         $payloadLength = strlen($payload);
 
-        // Set the first byte (opcode and flags)
-        $frame .= chr(0x81); // 0x81 = text frame (FIN bit set)
+        // Set the first byte (FIN bit and opcode)
+        $frame .= chr(0x80 | $opcode); // FIN bit set (0x80) + opcode
 
         // Set the second byte (mask and payload length)
         if ($payloadLength <= 125) {
@@ -278,11 +318,57 @@ class WebSocketServer implements WebSocketInterface
         return $frame;
     }
 
+    public function sendCloseFrame($socket, $statusCode = 1000, $reason = '')
+    {
+        // Check if the socket is still writable
+        if (socket_last_error($socket) === SOCKET_EPIPE) {
+            echo "Socket is already closed. Skipping close frame.\n";
+            return;
+        }
+
+        // Pack the status code into 2 bytes
+        $statusCode = pack('n', $statusCode);
+
+        // Combine the status code and reason
+        $payload = $statusCode . $reason;
+
+        // Create the close frame
+        $closeFrame = $this->encodeWebSocketFrame($payload, 0x88); // 0x88 = close frame
+
+        // Send the close frame
+        if (!@socket_write($socket, $closeFrame, strlen($closeFrame))) {
+            $error = socket_last_error($socket);
+            if ($error === SOCKET_EPIPE) {
+                echo "Socket is already closed may be by client. Skipping close frame.\n";
+            } else {
+                echo "Failed to send close frame: " . socket_strerror($error) . "\n";
+            }
+        }
+    }
+
     public function stop()
     {
-        if ($this->socket) {
-            socket_close($this->socket);
-            echo "WebSocket server stopped.\n";
+        if (!$this->running) {
+            return;
         }
+
+        $this->running = false;
+
+        // Send close frames to all clients
+        foreach ($this->clients as $client) {
+            $this->sendCloseFrame($client, 1000, 'Server shutting down');
+            socket_close($client);
+        }
+        echo "Clients connections closed.\n";
+
+        // Close the server socket only if it hasn't been closed already
+        if ($this->socket && !$this->socketClosed) {
+            socket_close($this->socket);
+            $this->socketClosed = true; // Mark the socket as closed
+            echo "WebSocket server socket closed.\n";
+        }
+
+        // Exit the script
+        exit(0);
     }
 }
