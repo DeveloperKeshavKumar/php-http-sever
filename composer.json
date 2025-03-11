@@ -1,7 +1,7 @@
 {
     "name": "arishem/php-http-server",
     "description": "A lightweight, in-house PHP HTTP server with WebSocket support.",
-    "version": "1.0.0",
+    "version": "1.0.1",
     "type": "library",
     "keywords": [
         "http-server",
