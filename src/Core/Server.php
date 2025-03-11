@@ -2,7 +2,7 @@
 
 namespace PhpHttpServer\Core;
 
-use PhpHttpServer\WebSocket\WebSocketHandlerInterface;
+use PhpHttpServer\WebSocket\WebSocketInterface;
 use PhpHttpServer\Middleware\MiddlewareStack;
 use PhpHttpServer\Cache\CacheInterface;
 use PhpHttpServer\Cache\Cache;
@@ -23,7 +23,7 @@ class Server
         $port = 8080,
         RouterInterface $router,
         array $middlewareStack = [],
-        WebSocketHandlerInterface $webSocketHandler = null,
+        WebSocketInterface $webSocketHandler = null,
         CacheInterface $cache = null
     ) {
         $this->host = $host;
@@ -41,47 +41,58 @@ class Server
 
     public function start()
     {
-        // Create a socket that listens on the specified host and port
-        $this->socket = stream_socket_server("tcp://{$this->host}:{$this->port}", $errno, $errstr);
-
-        if (!$this->socket) {
-            die("Failed to create socket: $errstr ($errno)\n");
+        // Create a TCP/IP socket
+        $this->socket = socket_create(AF_INET, SOCK_STREAM, SOL_TCP);
+        if ($this->socket === false) {
+            die("Failed to create socket: " . socket_strerror(socket_last_error()) . "\n");
         }
 
-        echo "Server listening on http://{$this->host}:{$this->port}\n";
+        // Bind the socket to the specified host and port
+        if (!socket_bind($this->socket, $this->host, $this->port)) {
+            die("Failed to bind socket: " . socket_strerror(socket_last_error($this->socket)) . "\n");
+        }
 
+        // Start listening for connections
+        if (!socket_listen($this->socket)) {
+            die("Failed to listen on socket: " . socket_strerror(socket_last_error($this->socket)) . "\n");
+        }
+
+        // Set the server socket to non-blocking mode
+        socket_set_nonblock($this->socket);
+
+        echo "Server listening on http://{$this->host}:{$this->port}\n";
+        $this->webSocketHandler->start();
         $this->clients[] = $this->socket;
 
         // Main server loop
         while (true) {
-            // Filter out invalid resources
-            $read = array_filter($this->clients, function ($conn) {
-                return is_resource($conn);
-            });
-
+            // Prepare the read array with the server socket and all client sockets
+            $read = array_merge([$this->socket], $this->clients);
             $write = $except = null;
 
-            // Wait for activity on any of the sockets
-            if (stream_select($read, $write, $except, null) === false) {
-                die("stream_select failed.\n");
+            // Use socket_select to monitor sockets for activity
+            if (socket_select($read, $write, $except, null) === false) {
+                die("socket_select failed: " . socket_strerror(socket_last_error()) . "\n");
             }
 
             foreach ($read as $conn) {
                 if ($conn === $this->socket) {
                     // Accept new connections
-                    $newConn = stream_socket_accept($this->socket);
-                    if ($newConn) {
+                    $newConn = socket_accept($this->socket);
+                    if ($newConn !== false) {
                         echo "New connection accepted.\n";
                         $this->clients[] = $newConn;
                     }
                 } else {
                     // Handle HTTP or WebSocket request
-                    $rawRequest = fread($conn, 8192);
+                    $rawRequest = socket_read($conn, 8192, PHP_BINARY_READ);
 
                     if ($rawRequest === false || $rawRequest === '') {
                         echo "Connection closed by client.\n";
-                        fclose($conn);
-                        $this->clients = array_diff($this->clients, [$conn]);
+                        socket_close($conn);
+                        $this->clients = array_filter($this->clients, function ($client) use ($conn) {
+                            return $client !== $conn;
+                        });
                         continue;
                     }
 
@@ -89,39 +100,39 @@ class Server
                     $response = new Response();
 
                     // Check if it's a WebSocket request
-                    if ($this->webSocketHandler && $this->webSocketHandler->handshake($request, $response)) {
-                        $response->send($conn);
-                        echo "WebSocket handshake successful.\n";
+                    if ($this->webSocketHandler && $this->isWebSocketRequest($request)) {
+                        echo "Trying WebSocket handshake .....\n";
+                        if ($this->webSocketHandler->handshake($conn)) {
+                            echo "WebSocket handshake successful.\n";
 
-                        // Fork a process to handle WebSocket communication
-                        $pid = pcntl_fork();
-
-                        if ($pid === -1) {
-                            // Fork failed
-                            die("Could not fork process\n");
-                        } elseif ($pid === 0) {
-                            // Child Process: Handles WebSocket
-                            fclose($this->socket); // Close parent socket in child process
-                            $this->webSocketHandler->handle($conn);
-                            exit(0);
+                            // Handle WebSocket communication in the same process
+                            $this->webSocketHandler->handleConnection($conn);
                         } else {
-                            // Parent Process: Keeps Listening
-                            fclose($conn); // Close client socket in parent process
+                            echo "WebSocket handshake failed.\n";
+                            socket_close($conn);
+                            $this->clients = array_filter($this->clients, function ($client) use ($conn) {
+                                return $client !== $conn;
+                            });
                         }
-
-                        // Remove the WebSocket connection from the clients array in parent
-                        $this->clients = array_diff($this->clients, [$conn]);
                     } else {
                         // Handle HTTP request
                         $this->handleHttpRequest($conn, $request);
 
                         // Close the HTTP connection
-                        fclose($conn);
-                        $this->clients = array_diff($this->clients, [$conn]);
+                        socket_close($conn);
+                        $this->clients = array_filter($this->clients, function ($client) use ($conn) {
+                            return $client !== $conn;
+                        });
                     }
                 }
             }
         }
+    }
+
+    private function isWebSocketRequest(Request $request)
+    {
+        return $request->getHeader('Upgrade') === 'websocket' &&
+            strtolower($request->getHeader('Connection')) === 'upgrade';
     }
 
     private function handleHttpRequest($conn, Request $request)
@@ -174,7 +185,7 @@ class Server
     public function stop()
     {
         if ($this->socket) {
-            fclose($this->socket);
+            socket_close($this->socket);
             echo "Server stopped.\n";
         }
     }

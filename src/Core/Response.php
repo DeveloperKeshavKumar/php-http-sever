@@ -203,7 +203,7 @@ class Response
         }
         $headers .= "Connection: close\r\n";
         $response = $statusLine . $headers . "\r\n" . $this->body;
-        fwrite($conn, $response);
+        socket_write($conn, $response);
     }
 
     /**
