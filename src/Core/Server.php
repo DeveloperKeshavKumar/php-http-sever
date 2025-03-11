@@ -17,6 +17,7 @@ class Server
     private $webSocketHandler;
     private $clients = [];
     private $cache;
+    private $webSocketPid;
 
     public function __construct(
         $host = '0.0.0.0',
@@ -61,7 +62,12 @@ class Server
         socket_set_nonblock($this->socket);
 
         echo "Server listening on http://{$this->host}:{$this->port}\n";
-        $this->webSocketHandler->start();
+
+        // Start WebSocket server in a separate process
+        if ($this->webSocketHandler) {
+            $this->startWebSocketServer();
+        }
+
         $this->clients[] = $this->socket;
 
         // Main server loop
@@ -129,6 +135,21 @@ class Server
         }
     }
 
+    private function startWebSocketServer()
+    {
+        $pid = pcntl_fork();
+        if ($pid == -1) {
+            die("Could not fork WebSocket server process.\n");
+        } elseif ($pid) {
+            // Parent process
+            $this->webSocketPid = $pid;
+        } else {
+            // Child process
+            $this->webSocketHandler->start();
+            exit(); // Exit the child process after the WebSocket server stops
+        }
+    }
+
     private function isWebSocketRequest(Request $request)
     {
         return $request->getHeader('Upgrade') === 'websocket' &&
@@ -187,6 +208,11 @@ class Server
         if ($this->socket) {
             socket_close($this->socket);
             echo "Server stopped.\n";
+        }
+
+        if ($this->webSocketPid) {
+            posix_kill($this->webSocketPid, SIGTERM);
+            echo "WebSocket server stopped.\n";
         }
     }
 }
