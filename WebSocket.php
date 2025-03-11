@@ -1,8 +1,6 @@
 <?php
 
-namespace PhpHttpServer\WebSocket;
-
-class WebSocketServer implements WebSocketInterface
+class WebSocketServer 
 {
     private $host;
     private $port;
@@ -92,11 +90,7 @@ class WebSocketServer implements WebSocketInterface
 
                 // Send a response back to the client
                 $responseFrame = $this->encodeWebSocketFrame("Server received: " . $decodedFrame['payload']);
-                if (!socket_write($client, $responseFrame, strlen($responseFrame))) {
-                    echo "socket_write failed: " . socket_strerror(socket_last_error()) . "\n";
-                    $this->removeClient($client);
-                    continue;
-                }
+                @socket_write($client, $responseFrame, strlen($responseFrame));
                 echo "Sent response to client.\n";
 
                 // Broadcast the message to all clients
@@ -110,12 +104,11 @@ class WebSocketServer implements WebSocketInterface
         $this->clients[] = $socket;
 
         while (true) {
-
-            $data = socket_read($socket, 8192, PHP_BINARY_READ);
-            if ($data === false) {
-                echo "socket_read failed: " . socket_strerror(socket_last_error()) . "\n";
+            $data = @socket_read($socket, 8192, PHP_BINARY_READ); // Suppress warnings
+            if ($data === false || $data === '') {
+                // Client disconnected
                 $this->removeClient($socket);
-                continue;
+                break;
             }
 
             // Decode the WebSocket frame
@@ -146,19 +139,13 @@ class WebSocketServer implements WebSocketInterface
         // Read the client's handshake request
         $request = socket_read($socket, 8192);
         if (empty($request)) {
-            echo "Empty handshake request.\n";
             return false;
         }
-
-        // Debug: Output the handshake request
-        echo "Handshake request received:\n";
-        echo $request . "\n";
 
         // Extract the WebSocket key from the request headers
         if (preg_match('/Sec-WebSocket-Key: (.*)\r\n/', $request, $matches)) {
             $key = trim($matches[1]);
         } else {
-            echo "No Sec-WebSocket-Key found.\n";
             return false;
         }
 
@@ -171,17 +158,11 @@ class WebSocketServer implements WebSocketInterface
         $response .= "Connection: Upgrade\r\n";
         $response .= "Sec-WebSocket-Accept: $acceptKey\r\n\r\n";
 
-        // Debug: Output the handshake response
-        echo "Handshake response:\n";
-        echo $response . "\n";
-
         // Send the handshake response
         if (!socket_write($socket, $response, strlen($response))) {
-            echo "Failed to send handshake response.\n";
             return false;
         }
 
-        echo "WebSocket handshake successful.\n";
         return true;
     }
 
@@ -286,3 +267,6 @@ class WebSocketServer implements WebSocketInterface
         }
     }
 }
+
+$webSocketServer = new WebSocketServer();
+$webSocketServer->start();
