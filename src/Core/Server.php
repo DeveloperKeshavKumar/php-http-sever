@@ -54,6 +54,11 @@ class Server
             die("Failed to create socket: " . socket_strerror(socket_last_error()) . "\n");
         }
 
+        // Allow reuse of the address
+        if (!socket_set_option($this->socket, SOL_SOCKET, SO_REUSEADDR, 1)) {
+            die("Failed to set socket option: " . socket_strerror(socket_last_error($this->socket)) . "\n");
+        }
+
         // Bind the socket to the specified host and port
         if (!socket_bind($this->socket, $this->host, $this->port)) {
             die("Failed to bind socket: " . socket_strerror(socket_last_error($this->socket)) . "\n");
@@ -119,6 +124,7 @@ class Server
 
                     if ($rawRequest === false || $rawRequest === '') {
                         echo "Connection closed by client.\n";
+                        @socket_shutdown($conn, 2);
                         socket_close($conn);
                         $this->clients = array_filter($this->clients, function ($client) use ($conn) {
                             return $client !== $conn;
@@ -139,6 +145,7 @@ class Server
                             $this->webSocketHandler->handleConnection($conn);
                         } else {
                             echo "WebSocket handshake failed.\n";
+                            @socket_shutdown($conn, 2);
                             socket_close($conn);
                             $this->clients = array_filter($this->clients, function ($client) use ($conn) {
                                 return $client !== $conn;
@@ -149,6 +156,7 @@ class Server
                         $this->handleHttpRequest($conn, $request);
 
                         // Close the HTTP connection
+                        @socket_shutdown($conn, 2);
                         socket_close($conn);
                         $this->clients = array_filter($this->clients, function ($client) use ($conn) {
                             return $client !== $conn;
@@ -241,6 +249,7 @@ class Server
         // Close all client connections
         foreach ($this->clients as $client) {
             if ($client !== $this->socket) {
+                socket_shutdown($this->socket, 2);
                 socket_close($client);
                 echo "Client connection closed.\n";
             }
