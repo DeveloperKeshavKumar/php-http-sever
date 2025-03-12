@@ -9,6 +9,7 @@ use PhpHttpServer\Core\Response;
 use PhpHttpServer\Middleware\ExampleMiddleware;
 use PhpHttpServer\Middleware\ModifyRequestResponseMiddleware;
 use PhpHttpServer\WebSocket\WebSocketServer;
+use PhpHttpServer\Template\Grind;
 
 if (!extension_loaded('pcntl')) {
     die('The pcntl extension is not available. You need to install it to fork processes.');
@@ -16,6 +17,10 @@ if (!extension_loaded('pcntl')) {
 
 // Initialize the router
 $router = new Router();
+$templateEngine = new Grind(__DIR__ . '/../views');
+
+// Set the view engine globally
+$router->setViewEngine($templateEngine);
 
 // Middleware stack (global middleware applied to all routes)
 $middlewareStack = [
@@ -76,10 +81,15 @@ $router->addRouteGroup('/posts', function (Router $router) {
 
 // Add a GET route: /
 $router->get('/', function (Request $request, Response $response) {
-    $data = ['name' => 'John Doe'];
+    $data = ['test' => 'Test page','rawtest'=>'<a href="/api/test">go to test</a>'];
     echo "Route Handler: Handling the request.\n";
     $response->setStatusCode(200)
-        ->render(__DIR__ . '/../views/home.php', $data);
+        ->render('/home.grd', $data);
+});
+
+$router->get('/download', function (Request $request, Response $response) {
+    $filePath = __DIR__ . '/assets/index.js';
+    $response->sendFile($filePath, );
 });
 
 // Add OPTIONS route: /users
