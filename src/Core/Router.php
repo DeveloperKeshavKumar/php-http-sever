@@ -3,6 +3,7 @@
 namespace PhpHttpServer\Core;
 
 use PhpHttpServer\Middleware\MiddlewareInterface;
+use PhpHttpServer\Template\Grind;
 
 class Router implements RouterInterface
 {
@@ -23,6 +24,7 @@ class Router implements RouterInterface
     private static $compiledPatterns = [];  // Cache for compiled route patterns
 
     private $currentPrefix = '';
+    private $templateEngine;
 
     /**
      * Adds a GET route.
@@ -299,5 +301,25 @@ class Router implements RouterInterface
 
         // Start the middleware pipeline
         $pipeline($request, $response);
+    }
+
+    /**
+     * Set the template engine globally.
+     *
+     * @param Grind $templateEngine The template engine instance.
+     */
+    public function setViewEngine(Grind $templateEngine): void
+    {
+        $this->templateEngine = $templateEngine;
+    }
+
+    /**
+     * Get the template engine.
+     *
+     * @return Grind|null The template engine instance.
+     */
+    public function getViewEngine(): ?Grind
+    {
+        return $this->templateEngine;
     }
 }
