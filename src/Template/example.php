@@ -7,5 +7,8 @@ use PhpHttpServer\Template\Grind;
 $temp = new Grind(__DIR__);
 
 echo $temp->render('example.grd', [
-    'score' => 55,
+    'users' => [
+        ['name' => 'John Doe', 'email' => 'john@example.com'],
+        ['name' => 'Jane Doe', 'email' => 'jane@example.com'],
+    ],
 ]);

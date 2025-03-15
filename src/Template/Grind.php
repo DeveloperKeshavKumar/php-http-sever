@@ -52,6 +52,12 @@ class Grind implements TemplateInterface
         // Process unescaped syntax (<%- %>)
         $content = $this->processUnescaped($content);
 
+        // Process conditional statements (<% if %>, <% else %>, <% endif %>)
+        $content = $this->processConditionals($content);
+
+        // Process loops (<% for %>, <% foreach %>, <% while %>)
+        $content = $this->processLoops($content);
+
         // Save the preprocessed content to a temporary file
         $tempFilePath = __DIR__ . '/temp/' . uniqid('grind_', true) . '.php';
         file_put_contents($tempFilePath, $content);
@@ -66,7 +72,22 @@ class Grind implements TemplateInterface
     private function processEscaped(string $content): string
     {
         return preg_replace_callback('/<%=+\s*(.+?)\s*%>/', function ($matches) {
-            return "<?php echo htmlspecialchars(\$" . $matches[1] . ", ENT_QUOTES, 'UTF-8'); ?>";
+            // Add $ prefix to variables in the expression
+            $expression = preg_replace('/(\b[a-zA-Z_]\w*\b)(?!=)/', '$$1', $matches[1]);
+
+            // Convert dot notation (e.g., user.name) to array access syntax (e.g., $user['name'])
+            $expression = preg_replace_callback('/(\$\w+)(?:\.(\w+))+/', function ($subMatches) {
+                // Split the dot notation into parts (e.g., $user.name.email becomes $user['name']['email'])
+                $parts = explode('.', $subMatches[0]);
+                $variable = array_shift($parts); // The first part is the variable (e.g., $user)
+                $result = $variable;
+                foreach ($parts as $part) {
+                    $result .= "['$part']";
+                }
+                return $result;
+            }, $expression);
+
+            return "<?php echo htmlspecialchars($expression, ENT_QUOTES, 'UTF-8'); ?>";
         }, $content);
     }
 
@@ -77,8 +98,71 @@ class Grind implements TemplateInterface
     private function processUnescaped(string $content): string
     {
         return preg_replace_callback('/<%-+\s*(.+?)\s*%>/', function ($matches) {
-            return "<?php echo \$" . $matches[1] . "; ?>";
+            // Add $ prefix to variables in the expression
+            $expression = preg_replace('/(\b[a-zA-Z_]\w*\b)(?!=)/', '$$1', $matches[1]);
+            return "<?php $expression; ?>";
         }, $content);
+    }
+
+    /**
+     * Process conditional statements (<% if %>, <% else %>, <% endif %>).
+     */
+    private function processConditionals(string $content): string
+    {
+        // Process if statements
+        // Process if statements
+        $content = preg_replace_callback('/<%+\s*if\s*\((.+?)\)\s*%>/', function ($matches) {
+            // Add $ prefix to variables in the condition
+            $condition = preg_replace('/(\b[a-zA-Z_]\w*\b)(?!=)/', '$$1', $matches[1]);
+            return "<?php if ($condition): ?>";
+        }, $content);
+
+        // Process elseif statements
+        $content = preg_replace_callback('/<%+\s*elseif\s*\((.+?)\)\s*%>/', function ($matches) {
+            // Add $ prefix to variables in the condition
+            $condition = preg_replace('/(\b[a-zA-Z_]\w*\b)(?!=)/', '$$1', $matches[1]);
+            return "<?php elseif ($condition): ?>";
+        }, $content);
+
+        // Process else statements
+        $content = preg_replace('/<%+\s*else\s*%>/', '<?php else: ?>', $content);
+
+        // Process endif statements
+        $content = preg_replace('/<%+\s*endif\s*%>/', '<?php endif; ?>', $content);
+
+        return $content;
+    }
+
+    private function processLoops(string $content): string
+    {
+        // Process for loops
+        $content = preg_replace_callback('/<%+\s*for\s*\((.+?)\)\s*%>/', function ($matches) {
+            // Add $ prefix to variables in the loop condition
+            $condition = preg_replace('/(\b[a-zA-Z_]\w*\b)(?!=)/', '$$1', $matches[1]);
+            return "<?php for ($condition): ?>";
+        }, $content);
+
+        // Process foreach loops
+        $content = preg_replace_callback('/<%+\s*foreach\s*\((.+?)\s+as\s+([a-zA-Z_]\w*)\)\s*%>/', function ($matches) {
+            // Add $ prefix to variables in the loop condition, but preserve the "as" keyword
+            $condition = preg_replace('/(\b[a-zA-Z_]\w*\b)(?!=)(?!\s+as\b)/', '$$1', $matches[1]);
+            $variable = '$' . $matches[2]; // Correctly reference the loop variable
+            return "<?php foreach ($condition as $variable): ?>";
+        }, $content);
+
+        // Process while loops
+        $content = preg_replace_callback('/<%+\s*while\s*\((.+?)\)\s*%>/', function ($matches) {
+            // Add $ prefix to variables in the loop condition
+            $condition = preg_replace('/(\b[a-zA-Z_]\w*\b)(?!=)/', '$$1', $matches[1]);
+            return "<?php while ($condition): ?>";
+        }, $content);
+
+        // Process endfor, endforeach, and endwhile
+        $content = preg_replace('/<%+\s*endfor\s*%>/', '<?php endfor; ?>', $content);
+        $content = preg_replace('/<%+\s*endforeach\s*%>/', '<?php endforeach; ?>', $content);
+        $content = preg_replace('/<%+\s*endwhile\s*%>/', '<?php endwhile; ?>', $content);
+
+        return $content;
     }
 
     public function setTemplateDir(string $templateDir): void
