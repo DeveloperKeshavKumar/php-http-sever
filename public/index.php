@@ -81,7 +81,10 @@ $router->addRouteGroup('/posts', function (Router $router) {
 
 // Add a GET route: /
 $router->get('/', function (Request $request, Response $response) {
-    $data = ['test' => 'Test page','rawtest'=>'<a href="/api/test">go to test</a>'];
+    $data = [
+        'userLoggedIn' => false,
+        'username' => 'JohnDoe',
+    ];
     echo "Route Handler: Handling the request.\n";
     $response->setStatusCode(200)
         ->render('/home.grd', $data);

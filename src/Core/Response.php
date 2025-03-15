@@ -1,12 +1,14 @@
 <?php
 
 namespace PhpHttpServer\Core;
+use PhpHttpServer\Template\Grind;
 
 class Response
 {
     private $statusCode;
     private $headers;
     private $body;
+    private $templateEngine;
 
     /**
      * Constructor to initialize the response.
@@ -174,19 +176,40 @@ class Response
     }
 
     /**
+     * Set the template engine.
+     *
+     * @param Grind $templateEngine The template engine instance.
+     */
+    public function setTemplateEngine(Grind $templateEngine): void
+    {
+        $this->templateEngine = $templateEngine;
+    }
+
+    /**
+     * Get the template engine.
+     *
+     * @return Grind|null The template engine instance.
+     */
+    public function getTemplateEngine(): ?Grind
+    {
+        return $this->templateEngine;
+    }
+
+    /**
      * Renders a template file with data and sends it as an HTML response.
      *
-     * @param string $file The template file path.
+     * @param string $template The template file path.
      * @param array $data The data to pass to the template.
      * @return self
      */
-    public function render($file, $data = [])
+    public function render(string $template, array $data = [])
     {
-        extract($data);
-        ob_start();
-        include $file;
-        $html = ob_get_clean();
-        return $this->sendHtml($html);
+        if (!$this->templateEngine) {
+            throw new \RuntimeException("Template engine is not set.");
+        }
+
+        $this->body = $this->templateEngine->render($template, $data);
+        return $this;
     }
 
     /**
