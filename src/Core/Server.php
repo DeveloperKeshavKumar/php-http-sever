@@ -209,9 +209,6 @@ class Server
             }
 
             $response = new Response();
-            if ($this->router->getViewEngine()) {
-                $response->setTemplateEngine($this->router->getViewEngine());
-            }
 
             // Combine global and route-specific middleware
             $middlewareStack = new MiddlewareStack();
